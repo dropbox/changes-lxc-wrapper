@@ -74,14 +74,14 @@ class Container(lxc.Container):
     def install(self, pkgs):
         return self.run(["apt-get", "install", "-y", "--force-yes"] + pkgs)
 
-    def launch(self, pre=None, post=None):
+    def launch(self, pre=None, post=None, clean=False, flush_cache=False):
         """ Launch a container
 
         If we have a variant, attempt to download and extract the image to clone.
         Without a variant, generate a container from ubuntu minimal install.
         """
 
-        if self.variant:
+        if self.variant and not clean:
             if self.variant not in lxc.list_containers():
                 create_args = [
                     '--server', self.image_mirror,
@@ -108,6 +108,8 @@ class Container(lxc.Container):
                 '--release', self.release,
                 '--arch', 'amd64',
             ]
+            if flush_cache:
+                create_args.extend(['--flush-cache'])
 
             print(" ==> Creating container")
             assert self.create('ubuntu', args=create_args), "Failed to create container"
@@ -203,6 +205,10 @@ if __name__ == '__main__':
                         help="Don't validate downloaded images")
     parser.add_argument('--save-snapshot', action='store_true', default=False,
                         help="Create an image from this container")
+    parser.add_argument('--clean', action='store_true', default=False,
+                        help="Use a fresh container from Ubuntu minimal install")
+    parser.add_argument('--flush-cache', action='store_true', default=False,
+                        help="Rebuild Ubuntu minimal install cache")
     parser.add_argument('--api-url',
                         help="API URL to Changes")
     parser.add_argument('--jobstep-id',
@@ -224,7 +230,7 @@ if __name__ == '__main__':
     container = Container(args.project, args.snapshot, args.variant, args.release,
                           args.image_mirror, args.validate)
     try:
-        container.launch(args.pre_launch, args.post_launch)
+        container.launch(args.pre_launch, args.post_launch, args.clean, args.flush_cache)
         if args.cmd:
             container.run(args.cmd)
         if args.api_url and args.jobstep_id:
