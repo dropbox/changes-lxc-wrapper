@@ -202,6 +202,8 @@ if __name__ == '__main__':
                         help="Explicit ID of container image to use")
     parser.add_argument('--release', '-r', default='precise',
                         help="Ubuntu release (default: %(default)s)")
+    parser.add_argument('--keep', action='store_true', default=False,
+                        help="Don't destroy the container after running cmd/build")
     parser.add_argument('--image-mirror', default="images.linuxcontainers.org",
                         help="Base URL of where container images are stored (default: %(default)s)")
     parser.add_argument('--no-validate', action='store_false', default=True, dest='validate',
@@ -246,4 +248,5 @@ if __name__ == '__main__':
         client.captureException()
         raise e
     finally:
-        container.destroy(force=True)
+        if not args.keep:
+            container.destroy(force=True)
