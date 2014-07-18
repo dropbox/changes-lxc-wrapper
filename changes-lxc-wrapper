@@ -228,7 +228,7 @@ if __name__ == '__main__':
         if args.cmd:
             container.run(args.cmd)
         if args.api_url and args.jobstep_id:
-            container.run(['/usr/local/bin/changes-client',
+            container.run(['changes-client',
                            '--api-url', args.api_url,
                            '--jobstep-id', args.jobstep_id])
         if args.save_snapshot:
