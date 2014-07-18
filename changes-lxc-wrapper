@@ -229,8 +229,8 @@ if __name__ == '__main__':
             container.run(args.cmd)
         if args.api_url and args.jobstep_id:
             container.run(['changes-client',
-                           '--api-url', args.api_url,
-                           '--jobstep-id', args.jobstep_id])
+                           '--server', args.api_url,
+                           '--jobstep_id', args.jobstep_id])
         if args.save_snapshot:
             container.create_image()
     except Exception as e:

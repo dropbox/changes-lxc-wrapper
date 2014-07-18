@@ -1,5 +1,5 @@
 PKG_NAME = changes-lxc-wrapper
-VERSION = 0.0.2
+VERSION = 0.0.3
 
 deb:
 	mkdir -p build/usr/local/bin
