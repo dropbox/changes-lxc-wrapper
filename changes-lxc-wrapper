@@ -69,7 +69,10 @@ class Container(lxc.Container):
             return subprocess.call(cmd, cwd=cwd, env=new_env)
 
         print(" ==> Running: {}".format(cmd))
-        return self.attach_wait(run, (cmd, cwd, env), env_policy=lxc.LXC_ATTACH_CLEAR_ENV)
+        ret_code = self.attach_wait(run, (cmd, cwd, env), env_policy=lxc.LXC_ATTACH_CLEAR_ENV)
+        print(" ==> Command exited: {}".format(ret_code))
+
+        return ret_code
 
     def install(self, pkgs):
         return self.run(["apt-get", "install", "-y", "--force-yes"] + pkgs)
@@ -181,14 +184,18 @@ class Container(lxc.Container):
 
         return (self.name, meta_txz, rootfs_txz)
 
-    def destroy(self, force=False, timeout=-1):
+    def destroy(self, timeout=-1):
         if not self.defined:
+            print(" ==> No container to destroy")
             return
 
-        if force and self.running:
+        if self.running:
+            print(" ==> Container is running, stop it first")
             self.stop()
+            print(" ==> Wait for container to stop")
             self.wait('STOPPED', timeout=timeout)
 
+        print(" ==> Destroying container")
         super().destroy()
 
 
@@ -249,4 +256,4 @@ if __name__ == '__main__':
         raise e
     finally:
         if not args.keep:
-            container.destroy(force=True)
+            container.destroy()
