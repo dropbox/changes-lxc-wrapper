@@ -11,6 +11,7 @@
 #     --project=changes \
 #     --script=examples/changes
 
+echo `whoami`
 echo $PATH
 
 git clone https://github.com/dropbox/changes.git ./source/
