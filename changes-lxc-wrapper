@@ -10,6 +10,7 @@ import time
 import uuid
 
 from io import BytesIO
+from uuid import uuid4
 
 import lxc
 
@@ -48,6 +49,15 @@ class Container(lxc.Container):
     def rootfs(self):
         """ May be real path or overlayfs:base-dir:delta-dir """
         return self.get_config_item('lxc.rootfs').split(':')[-1]
+
+    def run_script(self, script_path):
+        if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
+            new_name = os.path.join("tmp", "script-{}".format(uuid4().hex))
+            print(" ==> Writing local script {} as /{}".format(script_path, new_name))
+            shutil.copy(script_path, os.path.join(self.rootfs, new_name))
+            os.chmod(script_path, 755)
+            script_path = '/' + new_name
+        assert self.run([script_path]) == 0
 
     def run(self, cmd, cwd="/", env=None):
         assert self.running, "Cannot run cmd in non-RUNNING container"
@@ -137,9 +147,7 @@ class Container(lxc.Container):
 
         if post:
             # Naively check if trying to run a file that exists outside the container
-            if os.path.isfile(post) and not os.path.isfile(os.path.join(self.rootfs, post)):
-                post = shutil.copy(post, os.path.join(self.rootfs, "tmp", "changes-post-exec"))
-            assert self.run(post) == 0
+            self.run_script(post)
 
     def create_image(self, expires=86400, dest="/tmp"):
         print(" ==> Create meta.tar")
@@ -228,6 +236,8 @@ if __name__ == '__main__':
                         help="Command to run before container is launched")
     parser.add_argument('--post-launch',
                         help="Command to run after container is launched")
+    parser.add_argument('--script',
+                        help="Script to execute as command")
     parser.add_argument('cmd', nargs=argparse.REMAINDER,
                         help="Command to run inside the container")
 
@@ -242,8 +252,12 @@ if __name__ == '__main__':
                           args.image_mirror, args.validate)
     try:
         container.launch(args.pre_launch, args.post_launch, args.clean, args.flush_cache)
+
+        # TODO(dcramer): we should assert only one type of command arg is set
         if args.cmd:
             container.run(args.cmd)
+        if args.script:
+            container.run_script(args.script)
         if args.api_url and args.jobstep_id:
             container.run(['changes-client',
                            '--server', args.api_url,
@@ -251,8 +265,13 @@ if __name__ == '__main__':
         if args.save_snapshot:
             container.create_image(dest=os.getcwd())
     except Exception as e:
-        client.captureException()
+        if client:
+            client.captureException()
         raise e
     finally:
         if not args.keep:
             container.destroy()
+        else:
+            print(" ==> Container kept at {}".format(container.rootfs))
+            print(" ==> SSH available via:")
+            print(" ==>   $ sudo lxc-attach --name={}".format(container.name))
