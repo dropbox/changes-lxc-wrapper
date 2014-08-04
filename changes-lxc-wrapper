@@ -111,8 +111,7 @@ class Container(lxc.Container):
                 base = lxc.Container(self.variant)
 
             print(" ==> Overlaying container: {}".format(self.variant))
-            assert base.clone(self.name,
-                              flags=lxc.LXC_CLONE_KEEPNAME | lxc.LXC_CLONE_SNAPSHOT), (
+            assert base.clone(self.name, flags=lxc.LXC_CLONE_KEEPNAME | lxc.LXC_CLONE_SNAPSHOT), (
                 "Failed to clone: {}".format(self.variant))
             assert self.load_config(), "Unable to reload container config"
         else:
