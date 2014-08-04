@@ -1,0 +1,38 @@
+#!/bin/bash -eux
+
+# This example makes some assumptions about the system (such as NPM being installed), which
+# internally at Dropbox are handled by build system puppet configurations (and a few helper)
+# scripts.
+
+# Your system should be configured with a base image as such, and then run with something like:
+# sudo ./changes-lxc-wrapper \
+#     --pre-launch=/opt/citools/lxc-wrapper/container-bootstrap \
+#     --post-launch=/opt/citools/lxc-wrapper/post-launch \
+#     --project=changes \
+#     --script=examples/changes
+
+echo $PATH
+
+git clone https://github.com/dropbox/changes.git ./source/
+pushd source
+
+sudo apt-get install -y build-essential python-setuptools redis-server postgresql libpq-dev libevent-dev libxml2-dev libxslt-dev
+
+npm --version
+
+sudo npm install -g bower
+sudo easy_install -U pip
+sudo pip install virtualenv
+
+virtualenv --no-site-packages `pwd`/env
+
+export PATH=`pwd`/env/bin:$PATH
+
+sudo -u postgres createuser -s `whoami` --no-password || true
+sudo -u postgres createdb changes || true
+
+pip freeze
+
+# fix an issue with npm
+sudo chown -R `whoami` $(npm get cache)
+make test-full
