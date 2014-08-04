@@ -50,23 +50,35 @@ class Container(lxc.Container):
         """ May be real path or overlayfs:base-dir:delta-dir """
         return self.get_config_item('lxc.rootfs').split(':')[-1]
 
-    def run_script(self, script_path):
+    def get_home_dir(self, user):
+        return '/root' if user == 'root' else '/home/{}'.format(user)
+
+    def run_script(self, script_path, **kwargs):
         if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
             new_name = os.path.join("tmp", "script-{}".format(uuid4().hex))
             print(" ==> Writing local script {} as /{}".format(script_path, new_name))
             shutil.copy(script_path, os.path.join(self.rootfs, new_name))
             os.chmod(script_path, 755)
             script_path = '/' + new_name
-        assert self.run([script_path]) == 0
+        assert self.run([script_path], **kwargs) == 0
 
-    def run(self, cmd, cwd="/", env=None):
+    def run(self, cmd, cwd=None, env=None, user='root'):
         assert self.running, "Cannot run cmd in non-RUNNING container"
+
+        home_dir = self.get_home_dir(user)
+        if cwd is None:
+            cwd = home_dir
+        else:
+            cwd = '/'
 
         def run(args):
             cmd, cwd, env = args
 
             new_env = {
-                'HOME': '/root',
+                # TODO(dcramer): HOME is pretty hacky here
+                'USER': user,
+                'HOME': home_dir,
+                'PWD': cwd,
                 'DEBIAN_FRONTEND': 'noninteractive',
                 'LXC_NAME': self.name,
                 'HOST_HOSTNAME': socket.gethostname(),
@@ -74,6 +86,9 @@ class Container(lxc.Container):
             }
             if env:
                 new_env.update(env)
+
+            if user != 'root':
+                cmd = ['sudo', '-EHu', user] + cmd
 
             return subprocess.call(cmd, cwd=cwd, env=new_env)
 
@@ -235,6 +250,8 @@ if __name__ == '__main__':
                         help="Command to run before container is launched")
     parser.add_argument('--post-launch',
                         help="Command to run after container is launched")
+    parser.add_argument('--user', '-u', default='ubuntu',
+                        help="User to run command (or script) as")
     parser.add_argument('--script',
                         help="Script to execute as command")
     parser.add_argument('cmd', nargs=argparse.REMAINDER,
@@ -254,13 +271,13 @@ if __name__ == '__main__':
 
         # TODO(dcramer): we should assert only one type of command arg is set
         if args.cmd:
-            container.run(args.cmd)
+            container.run(args.cmd, user=args.user)
         if args.script:
-            container.run_script(args.script)
+            container.run_script(args.script, user=args.user)
         if args.api_url and args.jobstep_id:
             container.run(['changes-client',
                            '--server', args.api_url,
-                           '--jobstep_id', args.jobstep_id])
+                           '--jobstep_id', args.jobstep_id], user=args.user)
         if args.save_snapshot:
             container.create_image(dest=os.getcwd())
     except Exception as e:
