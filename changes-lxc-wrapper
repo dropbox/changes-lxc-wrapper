@@ -9,7 +9,7 @@ import tarfile
 import time
 
 from io import BytesIO
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import lxc
 
@@ -231,7 +231,7 @@ class Container(lxc.Container):
 
     def create_image(self, expires=86400, dest=None):
         if dest is None:
-            variant = str(uuid4())
+            variant = '{}-{}'.format(self.project, str(uuid4()))
             dest = "/var/cache/lxc/download/{}".format(
                 self.get_image_path(variant))
 
@@ -283,7 +283,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--project', '-p', required=True,
                         help="Name of project for the container")
-    parser.add_argument('--snapshot', '-s',
+    parser.add_argument('--snapshot', '-s', type=UUID,
                         help="Snapshot ID of the container")
     parser.add_argument('--variant',
                         help="Explicit ID of container image to use")
@@ -323,7 +323,7 @@ if __name__ == '__main__':
     except ValueError:
         pass
 
-    assert not (args.save_snapshot and args.variant), \
+    assert args.clean or (not (args.save_snapshot and (args.variant or args.snapshot))), \
         "You cannot create a snapshot from an existing snapshot"
 
     container = Container(args.project, args.snapshot, args.variant, args.release,

@@ -43,4 +43,6 @@ sudo -u postgres createdb changes || true
 
 pip freeze
 
-# make test-full
+sudo rm -rf /home/ubuntu/.npm
+
+make install-test-requirements
