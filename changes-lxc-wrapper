@@ -75,11 +75,15 @@ class Container(lxc.Container):
         if not os.path.exists(local_path):
             assert self.s3_bucket, 'Missing S3 bucket configuration'
 
+            os.makedirs(local_path)
+
             remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
-            print(" ==> Download image {}".format(variant))
-            assert subprocess.call(["aws", "s3", "sync", remote_path, local_path]), \
-                "Failed to download image {}".format(remote_path)
+            print(" ==> Downloading image {}".format(variant))
+            assert not subprocess.call(
+                ["aws", "s3", "sync", remote_path, local_path],
+                env=os.environ.copy(),
+            ), "Failed to download image {}".format(remote_path)
 
     def upload_image(self, variant):
         assert self.s3_bucket, 'Missing S3 bucket configuration'
@@ -89,8 +93,10 @@ class Container(lxc.Container):
         remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
         print(" ==> Uploading image {}".format(variant))
-        assert subprocess.call(["aws", "s3", "sync", local_path, remote_path]), \
-            "Failed to download image {}".format(remote_path)
+        assert not subprocess.call(
+            ["aws", "s3", "sync", local_path, remote_path],
+            env=os.environ.copy(),
+        ), "Failed to upload image {}".format(remote_path)
 
     def run_script(self, script_path, **kwargs):
         if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
@@ -169,7 +175,6 @@ class Container(lxc.Container):
                 self.ensure_image_cached(variant=self.variant)
 
                 create_args = [
-                    '--variant', self.variant,
                     '--dist', 'ubuntu',
                     '--release', self.release,
                     '--arch', 'amd64',
@@ -322,7 +327,7 @@ if __name__ == '__main__':
         "You cannot create a snapshot from an existing snapshot"
 
     container = Container(args.project, args.snapshot, args.variant, args.release,
-                          args.validate)
+                          args.validate, s3_bucket=args.s3_bucket)
     try:
         container.launch(args.pre_launch, args.post_launch, args.clean, args.flush_cache)
 
