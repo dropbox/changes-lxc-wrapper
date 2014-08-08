@@ -16,6 +16,10 @@ Provision and use ubuntu minimal install::
 
     $ changes-lxc-wrapper --project foo --api-url changes.example.com/api/0 --jobstep-id 46a8ed3da0174eb0ba5522aab8595d89
 
+.. note:: You will likely need to run these commands as root, and assuming you're
+          passing AWS credentials via environment variables you'll want to run
+          everything with `sudo -E`.
+
 Use a snapshot rather than bootstrapping a fresh container, add ``--snapshot``::
 
     $ changes-lxc-wrapper --project foo --snapshot 0001 --api-url changes.example.com/api/0 --jobstep-id 46a8ed3da0174eb0ba5522aab8595d89
