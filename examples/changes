@@ -6,18 +6,27 @@
 
 # Your system should be configured with a base image as such, and then run with something like:
 # sudo ./changes-lxc-wrapper \
-#     --pre-launch=/opt/citools/lxc-wrapper/container-bootstrap \
-#     --post-launch=/opt/citools/lxc-wrapper/post-launch \
 #     --project=changes \
 #     --script=examples/changes
 
 echo `whoami`
 echo $PATH
 
-git clone https://github.com/dropbox/changes.git ./source/
-pushd source
+sudo apt-get install -y python-software-properties software-properties-common
 
-sudo apt-get install -y build-essential python-setuptools redis-server postgresql libpq-dev libevent-dev libxml2-dev libxslt-dev
+sudo add-apt-repository -y ppa:chris-lea/node.js
+sudo add-apt-repository -y ppa:git-core/ppa
+sudo apt-get update -y
+
+sudo apt-get install -y git nodejs build-essential python-setuptools redis-server postgresql python-dev libpq-dev libevent-dev libxml2-dev libxslt-dev
+
+if [ ! -e ./source/ ]; then
+	git clone https://github.com/dropbox/changes.git ./source/
+	pushd source
+else
+	pushd source
+	git pull https://github.com/dropbox/changes.git master
+fi
 
 npm --version
 
@@ -34,6 +43,4 @@ sudo -u postgres createdb changes || true
 
 pip freeze
 
-# fix an issue with npm
-sudo chown -R `whoami` $(npm get cache)
-make test-full
+# make test-full
