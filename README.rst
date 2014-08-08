@@ -3,6 +3,12 @@ Changes LXC Wrapper
 
 Handles automating launching containers for running Changes builds.
 
+Requirements
+============
+
+- LXC 1.0
+- AWS CLI Tools (for snapshot integration)
+
 Run Changes Build
 =================
 
