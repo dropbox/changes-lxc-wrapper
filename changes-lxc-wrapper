@@ -7,7 +7,6 @@ import socket
 import subprocess
 import tarfile
 import time
-import uuid
 
 from io import BytesIO
 from uuid import uuid4
@@ -26,10 +25,11 @@ DESCRIPTION = "LXC Wrapper for running Changes jobs"
 
 class Container(lxc.Container):
     def __init__(self, project=None, snapshot=None, variant=None, release='precise',
-                 image_mirror="images.linuxcontainers.org", validate=True, *args, **kwargs):
+                 validate=True, s3_bucket=None, *args, **kwargs):
         self.project = project
         self.snapshot = snapshot
         self.release = release
+        self.s3_bucket = s3_bucket
 
         if variant is None and self.snapshot:
             self.variant = "{}-{}".format(project, snapshot)
@@ -39,11 +39,10 @@ class Container(lxc.Container):
         # This will be the hostname inside the container
         self.utsname = self.variant if self.variant else self.project
 
-        self.image_mirror = image_mirror
         self.validate = validate
 
         # Randomize container name to prevent clobbering
-        super().__init__(str(uuid.uuid1()), *args, **kwargs)
+        super().__init__(str(uuid4()), *args, **kwargs)
 
     @property
     def rootfs(self):
@@ -53,16 +52,56 @@ class Container(lxc.Container):
     def get_home_dir(self, user):
         return '/root' if user == 'root' else '/home/{}'.format(user)
 
+    def get_image_path(self, variant):
+        return "{dist}/{release}/{arch}/{variant}".format(
+            dist='ubuntu',
+            arch='amd64',
+            release=self.release,
+            variant=variant,
+        )
+
+    def ensure_image_cached(self, variant):
+        """
+        To avoid complexity of having a sort-of public host, and to ensure we
+        can just instead easily store images on S3 (or similar) we attempt to
+        sync images in a similar fashion to the LXC image downloader. This means
+        that when we attempt to run the image, the download will look for our
+        existing cache (that we've correctly populated) and just reference the
+        image from there.
+        """
+        path = self.get_image_path(variant)
+
+        local_path = "/var/cache/lxc/download/{}".format(path)
+        if not os.path.exists(local_path):
+            assert self.s3_bucket, 'Missing S3 bucket configuration'
+
+            remote_path = "s3://{}/{}".format(self.s3_bucket, path)
+
+            print(" ==> Download image {}".format(variant))
+            assert subprocess.call(["aws", "s3", "sync", remote_path, local_path]), \
+                "Failed to download image {}".format(remote_path)
+
+    def upload_image(self, variant):
+        assert self.s3_bucket, 'Missing S3 bucket configuration'
+
+        path = self.get_image_path(variant)
+        local_path = "/var/cache/lxc/download/{}".format(path)
+        remote_path = "s3://{}/{}".format(self.s3_bucket, path)
+
+        print(" ==> Uploading image {}".format(variant))
+        assert subprocess.call(["aws", "s3", "sync", local_path, remote_path]), \
+            "Failed to download image {}".format(remote_path)
+
     def run_script(self, script_path, **kwargs):
         if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
             new_name = os.path.join("tmp", "script-{}".format(uuid4().hex))
             print(" ==> Writing local script {} as /{}".format(script_path, new_name))
             shutil.copy(script_path, os.path.join(self.rootfs, new_name))
-            os.chmod(script_path, 755)
             script_path = '/' + new_name
+            self.run(['chmod', '0755', script_path], quiet=True)
         assert self.run([script_path], **kwargs) == 0
 
-    def run(self, cmd, cwd=None, env=None, user='root'):
+    def run(self, cmd, cwd=None, env=None, user='root', quiet=False):
         assert self.running, "Cannot run cmd in non-RUNNING container"
 
         home_dir = self.get_home_dir(user)
@@ -92,14 +131,31 @@ class Container(lxc.Container):
 
             return subprocess.call(cmd, cwd=cwd, env=new_env)
 
-        print(" ==> Running: {}".format(cmd))
+        if not quiet:
+            print(" ==> Running: {}".format(cmd))
+
         ret_code = self.attach_wait(run, (cmd, cwd, env), env_policy=lxc.LXC_ATTACH_CLEAR_ENV)
-        print(" ==> Command exited: {}".format(ret_code))
+
+        if not quiet:
+            print(" ==> Command exited: {}".format(ret_code))
 
         return ret_code
 
     def install(self, pkgs):
         return self.run(["apt-get", "install", "-y", "--force-yes"] + pkgs)
+
+    def setup_sudoers(self, user='ubuntu'):
+        sudoers_path = os.path.join(self.rootfs, 'etc', 'sudoers')
+
+        with open(sudoers_path, 'w') as fp:
+            fp.write('Defaults    env_reset\n')
+            fp.write('Defaults    !requiretty\n\n')
+            fp.write('# Allow all sudoers.\n')
+            fp.write('ALL  ALL=(ALL) NOPASSWD:ALL'.format(user))
+
+        subprocess.call(['chmod', '0440', sudoers_path])
+
+        return True
 
     def launch(self, pre=None, post=None, clean=False, flush_cache=False):
         """ Launch a container
@@ -110,18 +166,20 @@ class Container(lxc.Container):
 
         if self.variant and not clean:
             if self.variant not in lxc.list_containers():
+                self.ensure_image_cached(variant=self.variant)
+
                 create_args = [
-                    '--server', self.image_mirror,
                     '--variant', self.variant,
                     '--dist', 'ubuntu',
+                    '--release', self.release,
+                    '--arch', 'amd64',
                 ]
                 if not self.validate:
                     create_args.extend(['--no-validate'])
 
-                print(" ==> Getting image: {}".format(self.variant))
                 base = lxc.Container(self.variant)
                 assert base.create('download', args=create_args), (
-                    "Failed to download: {}".format(self.variant))
+                    "Failed to load cached image: {}".format(self.variant))
             else:
                 base = lxc.Container(self.variant)
 
@@ -159,41 +217,37 @@ class Container(lxc.Container):
         print(" ==> Install ca-certificates")
         assert self.install(["ca-certificates"]) == 0
 
+        print(" ==> Setting up sudoers")
+        assert self.setup_sudoers(), "Failed to setup sudoers"
+
         if post:
             # Naively check if trying to run a file that exists outside the container
             self.run_script(post)
 
-    def create_image(self, expires=86400, dest="/tmp"):
-        print(" ==> Create meta.tar")
-        with tarfile.open(os.path.join(dest, "meta.tar"), "w:") as meta_tar:
-            content = "{}\n".format(int(time.time() + expires))
-            expiry = tarfile.TarInfo("expiry")
-            expiry.size = len(content)
-            expiry.mtime = int(time.strftime("%s", time.localtime()))
-            meta_tar.addfile(expiry, BytesIO(content.encode('utf-8')))
-
-            lines = [
-                "lxc.include = LXC_TEMPLATE_CONFIG/ubuntu.common.conf",
-                "lxc.arch = x86_64",
-            ]
-            content = "\n".join(lines)
-            config = tarfile.TarInfo("config")
-            config.size = len(content)
-            config.mtime = int(time.strftime("%s", time.localtime()))
-            meta_tar.addfile(config, BytesIO(content.encode('utf-8')))
-
-        meta_txz = os.path.join(dest, "meta.tar.xz")
-        rootfs_txz = os.path.join(dest, "rootfs.tar.xz")
-
-        print(" ==> Create meta.tar.xz")
-        if os.path.exists(meta_txz):
-            os.remove(meta_txz)
-        subprocess.check_call(["xz", "-9", meta_tar.name])
+    def create_image(self, expires=86400, dest=None):
+        if dest is None:
+            variant = str(uuid4())
+            dest = "/var/cache/lxc/download/{}".format(
+                self.get_image_path(variant))
 
         print(" ==> Stopping container")
         self.stop()
 
         assert self.wait('STOPPED', timeout=30)
+
+        print(" ==> Saving snapshot to {}".format(dest))
+        if not os.path.exists(dest):
+            os.makedirs(dest)
+
+        print(" ==> Creating metadata")
+        with open(os.path.join(dest, "expiry"), "w") as fp:
+            fp.write("{}\n".format(int(time.time() + expires)))
+
+        with open(os.path.join(dest, "config"), "w") as fp:
+            fp.write("lxc.include = LXC_TEMPLATE_CONFIG/ubuntu.common.conf\n")
+            fp.write("lxc.arch = x86_64\n")
+
+        rootfs_txz = os.path.join(dest, "rootfs.tar.xz")
 
         print(" ==> Creating rootfs.tar.xz")
         subprocess.check_call(["tar", "-Jcf", rootfs_txz,
@@ -203,7 +257,7 @@ class Container(lxc.Container):
         with open(os.path.join(dest, "snapshot_id"), 'w') as fp:
             fp.write(self.utsname)
 
-        return (self.name, meta_txz, rootfs_txz)
+        return (variant, dest)
 
     def destroy(self, timeout=-1):
         if not self.defined:
@@ -232,8 +286,6 @@ if __name__ == '__main__':
                         help="Ubuntu release (default: %(default)s)")
     parser.add_argument('--keep', action='store_true', default=False,
                         help="Don't destroy the container after running cmd/build")
-    parser.add_argument('--image-mirror', default="images.linuxcontainers.org",
-                        help="Base URL of where container images are stored (default: %(default)s)")
     parser.add_argument('--no-validate', action='store_false', default=True, dest='validate',
                         help="Don't validate downloaded images")
     parser.add_argument('--save-snapshot', action='store_true', default=False,
@@ -254,6 +306,8 @@ if __name__ == '__main__':
                         help="User to run command (or script) as")
     parser.add_argument('--script',
                         help="Script to execute as command")
+    parser.add_argument('--s3-bucket',
+                        help="S3 Bucket to store/fetch images from")
     parser.add_argument('cmd', nargs=argparse.REMAINDER,
                         help="Command to run inside the container")
 
@@ -264,8 +318,11 @@ if __name__ == '__main__':
     except ValueError:
         pass
 
+    assert not (args.save_snapshot and args.variant), \
+        "You cannot create a snapshot from an existing snapshot"
+
     container = Container(args.project, args.snapshot, args.variant, args.release,
-                          args.image_mirror, args.validate)
+                          args.validate)
     try:
         container.launch(args.pre_launch, args.post_launch, args.clean, args.flush_cache)
 
@@ -279,7 +336,9 @@ if __name__ == '__main__':
                            '--server', args.api_url,
                            '--jobstep_id', args.jobstep_id], user=args.user)
         if args.save_snapshot:
-            container.create_image(dest=os.getcwd())
+            variant, *_ = container.create_image()
+            print(" ==> Snapshot saved: {}".format(variant))
+            container.upload_image(variant=variant)
     except Exception as e:
         if client:
             client.captureException()
