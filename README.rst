@@ -9,8 +9,8 @@ Requirements
 - LXC 1.0
 - AWS CLI Tools (for snapshot integration)
 
-Run Changes Build
-=================
+Run a Build
+===========
 
 Provision and use ubuntu minimal install::
 
@@ -26,6 +26,14 @@ Use a snapshot rather than bootstrapping a fresh container, add ``--snapshot``::
     $ changes-lxc-wrapper \
     	--project foo \
     	--snapshot 65072990854348a1a80c94bb0b6089e5
+
+When running in production, you'll be passing two values which will automatically
+specify the project and snapshot for you::
+
+    $ changes-lxc-wrapper \
+        --api-url https://changes.example.com/api/0/ \
+        --jobstep-id 65072990854348a1a80c94bb0b6089e5
+
 
 Creating a snapshot
 ===================
