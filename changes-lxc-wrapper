@@ -25,6 +25,20 @@ else:
 DESCRIPTION = "LXC Wrapper for running Changes jobs"
 
 
+def query_api(url, max_retries=5):
+    for retry_num in range(max_retries):
+        try:
+            fp = urlopen('{}/jobsteps/{}/'.format(api_url, args.jobstep_id))
+            return json.loads(fp.read().decode('utf-8'))
+        except Exception:
+            if retry_num == max_retries - 1:
+                raise
+
+            retry_delay = retry_num ** 2
+            print(" ==> API request failed, retrying in {}s".format(retry_delay))
+            time.sleep(retry_delay)
+
+
 class Container(lxc.Container):
     def __init__(self, snapshot=None, release='precise',
                  validate=True, s3_bucket=None, *args, **kwargs):
@@ -319,12 +333,11 @@ if __name__ == '__main__':
     else:
         api_url = None
 
-    if api_url and args.jobstep_id:
+    if not args.snapshot and api_url and args.jobstep_id:
         # fetch build information to set defaults for things like snapshot
         # TODO(dcramer): make this support a small amount of downtime
         # TODO(dcramer): make this verify the snapshot
-        fp = urlopen('{}/jobsteps/{}/'.format(api_url, args.jobstep_id))
-        resp = json.loads(fp.read().decode('utf-8'))
+        resp = query_api('{}/jobsteps/{}/'.format(api_url, args.jobstep_id))
         snapshot = str(UUID(resp['snapshot']['id']))
     else:
         snapshot = str(args.snapshot)
