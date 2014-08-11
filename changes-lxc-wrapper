@@ -82,20 +82,28 @@ class Container(lxc.Container):
         path = self.get_image_path(snapshot)
 
         local_path = "/var/cache/lxc/download/{}".format(path)
-        # TODO(dcramer): we should validate additional files or just always hit
-        # s3
-        if not os.path.exists(os.path.join(local_path, 'rootfs.tar.xz')):
-            assert self.s3_bucket, 'Missing S3 bucket configuration'
+        # list of files required to avoid network hit
+        file_list = [
+            'rootfs.tar.xz',
+            'config',
+            'expiry',
+            'snapshot_id',
+        ]
+        if all(os.path.exists(os.path.join(local_path, f)) for f in file_list):
+            return
 
+        assert self.s3_bucket, 'Missing S3 bucket configuration'
+
+        if not os.path.exists(local_path):
             os.makedirs(local_path)
 
-            remote_path = "s3://{}/{}".format(self.s3_bucket, path)
+        remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
-            print(" ==> Downloading image {}".format(snapshot))
-            assert not subprocess.call(
-                ["aws", "s3", "sync", remote_path, local_path],
-                env=os.environ.copy(),
-            ), "Failed to download image {}".format(remote_path)
+        print(" ==> Downloading image {}".format(snapshot))
+        assert not subprocess.call(
+            ["aws", "s3", "sync", remote_path, local_path],
+            env=os.environ.copy(),
+        ), "Failed to download image {}".format(remote_path)
 
     def upload_image(self, snapshot):
         assert self.s3_bucket, 'Missing S3 bucket configuration'
