@@ -188,6 +188,7 @@ class Container(lxc.Container):
                     '--dist', 'ubuntu',
                     '--release', self.release,
                     '--arch', 'amd64',
+                    '--variant', self.snapshot,
                 ]
                 if not self.validate:
                     create_args.extend(['--no-validate'])
