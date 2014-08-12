@@ -375,8 +375,10 @@ if __name__ == '__main__':
         assert resp['status']['id'] != 'finished', 'JobStep already marked as finished, aborting.'
 
         snapshot = str(UUID(resp['snapshot']['id']))
-    else:
+    elif args.snapshot:
         snapshot = str(args.snapshot)
+    else:
+        snapshot = None
 
     assert args.clean or not (args.save_snapshot and snapshot), \
         "You cannot create a snapshot from an existing snapshot"
