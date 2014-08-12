@@ -60,10 +60,10 @@ class ChangesApi(object):
 
 
 class Container(lxc.Container):
-    def __init__(self, snapshot=None, release=DEFAULT_RELEASE,
+    def __init__(self, snapshot=None, release=None,
                  validate=True, s3_bucket=None, *args, **kwargs):
         self.snapshot = snapshot
-        self.release = release
+        self.release = release or DEFAULT_RELEASE
         self.s3_bucket = s3_bucket
 
         # This will be the hostname inside the container
@@ -393,8 +393,13 @@ if __name__ == '__main__':
     assert args.clean or not (args.save_snapshot and snapshot), \
         "You cannot create a snapshot from an existing snapshot"
 
-    container = Container(snapshot, args.release,
-                          args.validate, s3_bucket=args.s3_bucket)
+    container = Container(
+        snapshot=snapshot,
+        release=release,
+        validate=args.validate,
+        s3_bucket=args.s3_bucket,
+    )
+
     try:
         if args.jobstep_id:
             api.update_jobstep(args.jobstep_id, {"status": "in_progress"})
