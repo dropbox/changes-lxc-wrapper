@@ -27,6 +27,8 @@ else:
 
 DESCRIPTION = "LXC Wrapper for running Changes jobs"
 
+DEFAULT_RELEASE = 'precise'
+
 
 class ChangesApi(object):
     def __init__(self, base_url):
@@ -58,7 +60,7 @@ class ChangesApi(object):
 
 
 class Container(lxc.Container):
-    def __init__(self, snapshot=None, release='precise',
+    def __init__(self, snapshot=None, release=DEFAULT_RELEASE,
                  validate=True, s3_bucket=None, *args, **kwargs):
         self.snapshot = snapshot
         self.release = release
@@ -324,8 +326,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=DESCRIPTION)
     parser.add_argument('--snapshot', '-s', type=UUID,
                         help="Snapshot ID of the container")
-    parser.add_argument('--release', '-r', default='precise',
-                        help="Ubuntu release (default: %(default)s)")
+    parser.add_argument('--release', '-r',
+                        help="Ubuntu release (default: {})".format(DEFAULT_RELEASE))
     parser.add_argument('--keep', action='store_true', default=False,
                         help="Don't destroy the container after running cmd/build")
     parser.add_argument('--no-validate', action='store_false', default=True, dest='validate',
@@ -369,21 +371,28 @@ if __name__ == '__main__':
         assert not args.jobstep_id, "jobstep_id passed without api_url"
         api = None
 
-    if not args.snapshot and args.jobstep_id:
+    if args.jobstep_id:
         # fetch build information to set defaults for things like snapshot
         # TODO(dcramer): make this support a small amount of downtime
         # TODO(dcramer): make this verify the snapshot
         resp = api.get_jobstep(args.jobstep_id)
         assert resp['status']['id'] != 'finished', 'JobStep already marked as finished, aborting.'
 
-        if resp['snapshot']:
-            snapshot = str(UUID(resp['snapshot']['id']))
-        else:
-            snapshot = None
-    elif args.snapshot:
-        snapshot = str(args.snapshot)
+        if not args.snapshot:
+            if resp['snapshot']:
+                snapshot = str(UUID(resp['snapshot']['id']))
+            else:
+                snapshot = None
+
+        if not args.release:
+            if resp['data'].get('release'):
+                release = resp['data']['release']
+            else:
+                release = DEFAULT_RELEASE
+
     else:
-        snapshot = None
+        snapshot = str(args.snapshot) if args.snapshot else None
+        release = args.release or DEFAULT_RELEASE
 
     assert args.clean or not (args.save_snapshot and snapshot), \
         "You cannot create a snapshot from an existing snapshot"
