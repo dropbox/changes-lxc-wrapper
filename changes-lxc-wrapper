@@ -106,7 +106,6 @@ class Container(lxc.Container):
         file_list = [
             'rootfs.tar.xz',
             'config',
-            'expiry',
             'snapshot_id',
         ]
         if all(os.path.exists(os.path.join(local_path, f)) for f in file_list):
@@ -288,9 +287,6 @@ class Container(lxc.Container):
             os.makedirs(dest)
 
         print(" ==> Creating metadata")
-        with open(os.path.join(dest, "expiry"), "w") as fp:
-            fp.write("{}\n".format(int(time.time() + expires)))
-
         with open(os.path.join(dest, "config"), "w") as fp:
             fp.write("lxc.include = LXC_TEMPLATE_CONFIG/ubuntu.common.conf\n")
             fp.write("lxc.arch = x86_64\n")
