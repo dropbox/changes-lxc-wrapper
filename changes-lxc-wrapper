@@ -374,7 +374,10 @@ if __name__ == '__main__':
         resp = api.get_jobstep(args.jobstep_id)
         assert resp['status']['id'] != 'finished', 'JobStep already marked as finished, aborting.'
 
-        snapshot = str(UUID(resp['snapshot']['id']))
+        try:
+            snapshot = str(UUID(resp['snapshot']['id']))
+        except KeyError:
+            snapshot = None
     elif args.snapshot:
         snapshot = str(args.snapshot)
     else:
