@@ -186,6 +186,8 @@ class Container(lxc.Container):
         return ret_code
 
     def install(self, pkgs):
+        assert self.run(["apt-get", "update", "-y", "--fix-missing"]) == 0, \
+            "Failed updating apt resources"
         return self.run(["apt-get", "install", "-y", "--force-yes"] + pkgs)
 
     def setup_sudoers(self, user='ubuntu'):
