@@ -14,8 +14,7 @@ Run a Build
 
 Provision and use ubuntu minimal install::
 
-    $ changes-lxc-wrapper \
-    	--project foo
+    $ changes-lxc-wrapper
 
 .. note:: You will likely need to run these commands as root, and assuming you're
           passing AWS credentials via environment variables you'll want to run
@@ -24,7 +23,6 @@ Provision and use ubuntu minimal install::
 Use a snapshot rather than bootstrapping a fresh container, add ``--snapshot``::
 
     $ changes-lxc-wrapper \
-    	--project foo \
     	--snapshot 65072990854348a1a80c94bb0b6089e5
 
 When running in production, you'll be passing two values which will automatically
@@ -41,7 +39,6 @@ Creating a snapshot
 This will create a ``meta.tar.xz`` and a ``rootfs.tar.xz``::
 
     $ changes-lxc-wrapper \
-    	--project foo \
     	--snapshot 65072990854348a1a80c94bb0b6089e5 \
     	--save-snapshot \
     	--clean
@@ -56,5 +53,12 @@ Run Command
 Simply launch a container and run a command::
 
     $ changes-lxc-wrapper \
-    	--project foo \
     	-- echo "hello world"
+
+
+Running the Sample Build
+========================
+
+Assuming you're using the VM, login and jump into /vagrant/. Once there, you can run the following:
+
+    $ sudo ./changes-lxc-wrapper --script examples/changes
