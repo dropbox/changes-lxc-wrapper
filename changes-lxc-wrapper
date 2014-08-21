@@ -374,23 +374,35 @@ if __name__ == '__main__':
         resp = api.get_jobstep(args.jobstep_id)
         assert resp['status']['id'] != 'finished', 'JobStep already marked as finished, aborting.'
 
-        if not args.snapshot:
+        if resp['data'].get('release'):
+            release = resp['data']['release']
+        else:
+            release = DEFAULT_RELEASE
+
+        # If we're expected a snapshot output we need to override
+        # any snapshot parameters, and also ensure we're creating a clean
+        # image
+        if resp['expectedSnapshot']:
+            assert not snapshot, 'You cannot specify a snapshot when '
+            snapshot = str(UUID(resp['expectedSnapshot']['id']))
+            save_snapshot = True
+            clean = True
+
+        else:
             if resp['snapshot']:
                 snapshot = str(UUID(resp['snapshot']['id']))
             else:
                 snapshot = None
-
-        if not args.release:
-            if resp['data'].get('release'):
-                release = resp['data']['release']
-            else:
-                release = DEFAULT_RELEASE
+            save_snapshot = False
+            clean = False
 
     else:
+        clean = args.clean
         snapshot = str(args.snapshot) if args.snapshot else None
+        save_snapshot = args.save_snapshot
         release = args.release or DEFAULT_RELEASE
 
-    assert args.clean or not (args.save_snapshot and snapshot), \
+    assert clean or not (save_snapshot and snapshot), \
         "You cannot create a snapshot from an existing snapshot"
 
     container = Container(
@@ -404,7 +416,7 @@ if __name__ == '__main__':
         if args.jobstep_id:
             api.update_jobstep(args.jobstep_id, {"status": "in_progress"})
 
-        container.launch(args.pre_launch, args.post_launch, args.clean, args.flush_cache)
+        container.launch(args.pre_launch, args.post_launch, clean, args.flush_cache)
 
         # TODO(dcramer): we should assert only one type of command arg is set
         if args.cmd:
@@ -415,7 +427,7 @@ if __name__ == '__main__':
             container.run(['changes-client',
                            '--server', args.api_url,
                            '--jobstep_id', args.jobstep_id], user=args.user)
-        if args.save_snapshot:
+        if save_snapshot:
             snapshot, *_ = container.create_image()
             print(" ==> Snapshot saved: {}".format(snapshot))
             container.upload_image(snapshot=snapshot)
