@@ -35,6 +35,9 @@ class ChangesApi(object):
         self.base_url = base_url.rstrip('/')
 
     def request(self, path, data=None, max_retries=5):
+        if isinstance(data, dict):
+            data = urlencode(data).encode('utf-8')
+
         url = '{}/{}'.format(self.base_url, path.lstrip('/'))
         logging.info('Making request to {}'.format(url))
         for retry_num in range(max_retries):
@@ -51,12 +54,13 @@ class ChangesApi(object):
         raise
 
     def update_jobstep(self, jobstep_id, data):
-        if isinstance(data, dict):
-            data = urlencode(data).encode('utf-8')
         return self.request('/jobsteps/{}/'.format(jobstep_id), data)
 
     def get_jobstep(self, jobstep_id):
         return self.request('/jobsteps/{}/'.format(jobstep_id))
+
+    def update_snapshot(self, snapshot_id, data):
+        return self.request('/snapshots/{}/'.format(snapshot_id), data)
 
 
 class Container(lxc.Container):
@@ -430,6 +434,8 @@ if __name__ == '__main__':
             snapshot, *_ = container.create_image()
             print(" ==> Snapshot saved: {}".format(snapshot))
             container.upload_image(snapshot=snapshot)
+
+            api.update_snapshot(snapshot, {"status": "active"})
     except Exception as e:
         if args.jobstep_id:
             api.update_jobstep(args.jobstep_id, {"status": "finished", "result": "failed"})
