@@ -47,7 +47,7 @@ class ChangesApi(object):
             except URLError as e:
                 if retry_num < max_retries - 1:
                     retry_delay = retry_num ** 2
-                    print(" ==> API request failed, retrying in {}s".format(
+                    print(" ==> API request failed ({}), retrying in {}s".format(
                         getattr(e, 'code', type(e)), retry_delay))
                     time.sleep(retry_delay)
         print(" ==> Failed request to {}".format(path))
@@ -59,8 +59,8 @@ class ChangesApi(object):
     def get_jobstep(self, jobstep_id):
         return self.request('/jobsteps/{}/'.format(jobstep_id))
 
-    def update_snapshot(self, snapshot_id, data):
-        return self.request('/snapshots/{}/'.format(snapshot_id), data)
+    def update_snapshot_image(self, snapshot_id, data):
+        return self.request('/snapshotimages/{}/'.format(snapshot_id), data)
 
 
 class Container(lxc.Container):
@@ -434,7 +434,7 @@ if __name__ == '__main__':
             print(" ==> Snapshot saved: {}".format(snapshot))
             container.upload_image(snapshot=snapshot)
 
-            api.update_snapshot(snapshot, {"status": "active"})
+            api.update_snapshot_image(snapshot, {"status": "active"})
     except Exception as e:
         if args.jobstep_id:
             api.update_jobstep(args.jobstep_id, {"status": "finished", "result": "failed"})
