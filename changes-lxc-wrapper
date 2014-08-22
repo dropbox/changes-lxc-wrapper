@@ -383,7 +383,6 @@ if __name__ == '__main__':
         # any snapshot parameters, and also ensure we're creating a clean
         # image
         if resp['expectedSnapshot']:
-            assert not snapshot, 'You cannot specify a snapshot when '
             snapshot = str(UUID(resp['expectedSnapshot']['id']))
             save_snapshot = True
             clean = True
