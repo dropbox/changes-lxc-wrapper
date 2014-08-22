@@ -46,11 +46,13 @@ class ChangesApi(object):
 
                 body = fp.read().decode('utf-8')
                 return json.loads(body)
-            except URLError:
+            except URLError as e:
                 if retry_num < max_retries - 1:
                     retry_delay = retry_num ** 2
-                    print(" ==> API request failed, retrying in {}s".format(retry_delay))
+                    print(" ==> API request failed, retrying in {}s".format(
+                        getattr(e, 'code', type(e)), retry_delay))
                     time.sleep(retry_delay)
+        print(" ==> Failed request to {}".format(path))
         raise
 
     def update_jobstep(self, jobstep_id, data):
