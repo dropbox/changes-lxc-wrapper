@@ -439,6 +439,9 @@ if __name__ == '__main__':
         if args.jobstep_id:
             api.update_jobstep(args.jobstep_id, {"status": "finished", "result": "failed"})
 
+            if save_snapshot:
+                api.update_snapshot_image(snapshot, {"status": "failed"})
+
         if client:
             client.captureException()
         raise e
