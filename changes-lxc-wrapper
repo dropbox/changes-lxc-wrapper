@@ -275,11 +275,10 @@ class Container(lxc.Container):
             # Naively check if trying to run a file that exists outside the container
             self.run_script(post)
 
-    def create_image(self, expires=86400, dest=None):
-        if dest is None:
-            snapshot = self.snapshot or str(uuid4())
-            dest = "/var/cache/lxc/download/{}".format(
-                self.get_image_path(snapshot))
+    def create_image(self):
+        snapshot = self.snapshot or str(uuid4())
+        dest = "/var/cache/lxc/download/{}".format(
+            self.get_image_path(snapshot))
 
         print(" ==> Stopping container")
         self.stop()
@@ -305,7 +304,7 @@ class Container(lxc.Container):
         with open(os.path.join(dest, "snapshot_id"), 'w') as fp:
             fp.write(self.utsname)
 
-        return (snapshot, dest)
+        return snapshot
 
     def destroy(self, timeout=-1):
         if not self.defined:
@@ -431,7 +430,7 @@ if __name__ == '__main__':
                            '--server', args.api_url,
                            '--jobstep_id', args.jobstep_id], user=args.user)
         if save_snapshot:
-            snapshot, *_ = container.create_image()
+            snapshot = container.create_image()
             print(" ==> Snapshot saved: {}".format(snapshot))
             container.upload_image(snapshot=snapshot)
 
