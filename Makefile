@@ -1,5 +1,5 @@
 PKG_NAME = changes-lxc-wrapper
-VERSION = 0.0.5
+VERSION = 0.0.6
 REV=`git rev-list HEAD --count`
 
 deb:
