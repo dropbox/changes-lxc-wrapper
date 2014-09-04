@@ -9,6 +9,16 @@ Requirements
 - LXC 1.0
 - AWS CLI Tools (for snapshot integration)
 
+Development
+===========
+
+Provision the Vagrant VM:
+
+    $ vagrant up --provision
+
+This will install various system dependencies as well as setting up a symlink
+for the ``changes-lxc-wrapper`` package.
+
 Run a Build
 ===========
 

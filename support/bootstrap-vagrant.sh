@@ -7,6 +7,9 @@ sudo add-apt-repository -y ppa:awstools-dev/awstools
 
 sudo apt-get update -y
 
+# Install basic Python support
+sudo apt-get install -y python3 python3-setuptools python3-pip
+
 # Install aws cli tools
 sudo apt-get install -y awscli
 
@@ -16,3 +19,6 @@ sudo apt-get install -y libcgmanager0 lxc
 # Install fpm
 sudo apt-get install -y ruby-dev gcc
 sudo gem install fpm --no-ri --no-rdoc
+
+cd /vagrant/
+sudo pip install -e .
