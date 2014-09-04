@@ -64,7 +64,7 @@ class WrapperCommand(object):
                             help="Script to execute as command")
         parser.add_argument('--s3-bucket',
                             help="S3 Bucket to store/fetch images from")
-        parser.add_argument('--log-level', default='INFO')
+        parser.add_argument('--log-level', default='WARN')
         parser.add_argument('cmd', nargs=argparse.REMAINDER,
                             help="Command to run inside the container")
         return parser
