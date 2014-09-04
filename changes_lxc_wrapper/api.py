@@ -42,4 +42,4 @@ class ChangesApi(object):
         return self.request('/snapshotimages/{}/'.format(snapshot_id), data)
 
     def append_log(self, jobstep_id, data):
-        return self.request('/jobsteps/{}/'.format(jobstep_id), data)
+        return self.request('/jobsteps/{}/logappend/'.format(jobstep_id), data)
