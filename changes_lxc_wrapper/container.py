@@ -1,73 +1,19 @@
-#!/usr/bin/env python3
-
-import argparse
-import json
-import logging
+import lxc
 import os
 import shutil
 import socket
 import subprocess
-import time
 
-from urllib.error import URLError
-from urllib.parse import urlencode
-from urllib.request import urlopen
-from uuid import UUID, uuid4
-
-import lxc
-
-try:
-    import raven
-except ImportError:
-    client = None
-else:
-    client = raven.Client()
-
-DESCRIPTION = "LXC Wrapper for running Changes jobs"
+from uuid import uuid4
 
 DEFAULT_RELEASE = 'precise'
 
 
-class ChangesApi(object):
-    def __init__(self, base_url):
-        self.base_url = base_url.rstrip('/')
-
-    def request(self, path, data=None, max_retries=5):
-        if isinstance(data, dict):
-            data = urlencode(data).encode('utf-8')
-
-        url = '{}/{}'.format(self.base_url, path.lstrip('/'))
-        logging.info('Making request to {}'.format(url))
-        for retry_num in range(max_retries):
-            try:
-                fp = urlopen(url, data=data, timeout=5)
-
-                body = fp.read().decode('utf-8')
-                return json.loads(body)
-            except URLError as e:
-                if retry_num < max_retries - 1:
-                    retry_delay = retry_num ** 2
-                    print(" ==> API request failed ({}), retrying in {}s".format(
-                        getattr(e, 'code', type(e)), retry_delay))
-                    time.sleep(retry_delay)
-        print(" ==> Failed request to {}".format(path))
-        raise
-
-    def update_jobstep(self, jobstep_id, data):
-        return self.request('/jobsteps/{}/'.format(jobstep_id), data)
-
-    def get_jobstep(self, jobstep_id):
-        return self.request('/jobsteps/{}/'.format(jobstep_id))
-
-    def update_snapshot_image(self, snapshot_id, data):
-        return self.request('/snapshotimages/{}/'.format(snapshot_id), data)
-
-
 class Container(lxc.Container):
-    def __init__(self, snapshot=None, release=None,
-                 validate=True, s3_bucket=None, *args, **kwargs):
+    def __init__(self, release, snapshot=None, validate=True, s3_bucket=None,
+                 *args, **kwargs):
         self.snapshot = snapshot
-        self.release = release or DEFAULT_RELEASE
+        self.release = release
         self.s3_bucket = s3_bucket
 
         # This will be the hostname inside the container
@@ -319,139 +265,3 @@ class Container(lxc.Container):
 
         print(" ==> Destroying container")
         super().destroy()
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description=DESCRIPTION)
-    parser.add_argument('--snapshot', '-s', type=UUID,
-                        help="Snapshot ID of the container")
-    parser.add_argument('--release', '-r',
-                        help="Ubuntu release (default: {})".format(DEFAULT_RELEASE))
-    parser.add_argument('--keep', action='store_true', default=False,
-                        help="Don't destroy the container after running cmd/build")
-    parser.add_argument('--no-validate', action='store_false', default=True, dest='validate',
-                        help="Don't validate downloaded images")
-    parser.add_argument('--save-snapshot', action='store_true', default=False,
-                        help="Create an image from this container")
-    parser.add_argument('--clean', action='store_true', default=False,
-                        help="Use a fresh container from Ubuntu minimal install")
-    parser.add_argument('--flush-cache', action='store_true', default=False,
-                        help="Rebuild Ubuntu minimal install cache")
-    parser.add_argument('--api-url',
-                        help="API URL to Changes (i.e. https://changes.example.com/api/0/)")
-    parser.add_argument('--jobstep-id',
-                        help="Jobstep ID for Changes")
-    parser.add_argument('--pre-launch',
-                        help="Command to run before container is launched")
-    parser.add_argument('--post-launch',
-                        help="Command to run after container is launched")
-    parser.add_argument('--user', '-u', default='ubuntu',
-                        help="User to run command (or script) as")
-    parser.add_argument('--script',
-                        help="Script to execute as command")
-    parser.add_argument('--s3-bucket',
-                        help="S3 Bucket to store/fetch images from")
-    parser.add_argument('--log-level', default='INFO')
-    parser.add_argument('cmd', nargs=argparse.REMAINDER,
-                        help="Command to run inside the container")
-
-    args = parser.parse_args()
-
-    logging.basicConfig(level=args.log_level)
-
-    try:
-        args.cmd.remove('--')
-    except ValueError:
-        pass
-
-    if args.api_url:
-        api = ChangesApi(args.api_url)
-    else:
-        assert not args.jobstep_id, "jobstep_id passed without api_url"
-        api = None
-
-    if args.jobstep_id:
-        # fetch build information to set defaults for things like snapshot
-        # TODO(dcramer): make this support a small amount of downtime
-        # TODO(dcramer): make this verify the snapshot
-        resp = api.get_jobstep(args.jobstep_id)
-        assert resp['status']['id'] != 'finished', 'JobStep already marked as finished, aborting.'
-
-        if resp['data'].get('release'):
-            release = resp['data']['release']
-        else:
-            release = DEFAULT_RELEASE
-
-        # If we're expected a snapshot output we need to override
-        # any snapshot parameters, and also ensure we're creating a clean
-        # image
-        if resp['expectedSnapshot']:
-            snapshot = str(UUID(resp['expectedSnapshot']['id']))
-            save_snapshot = True
-            clean = True
-
-        else:
-            if resp['snapshot']:
-                snapshot = str(UUID(resp['snapshot']['id']))
-            else:
-                snapshot = None
-            save_snapshot = False
-            clean = False
-
-    else:
-        clean = args.clean
-        snapshot = str(args.snapshot) if args.snapshot else None
-        save_snapshot = args.save_snapshot
-        release = args.release or DEFAULT_RELEASE
-
-    assert clean or not (save_snapshot and snapshot), \
-        "You cannot create a snapshot from an existing snapshot"
-
-    container = Container(
-        snapshot=snapshot,
-        release=release,
-        validate=args.validate,
-        s3_bucket=args.s3_bucket,
-    )
-
-    try:
-        if args.jobstep_id:
-            api.update_jobstep(args.jobstep_id, {"status": "in_progress"})
-
-        container.launch(args.pre_launch, args.post_launch, clean, args.flush_cache)
-
-        # TODO(dcramer): we should assert only one type of command arg is set
-        if args.cmd:
-            container.run(args.cmd, user=args.user)
-        if args.script:
-            container.run_script(args.script, user=args.user)
-        if args.api_url and args.jobstep_id:
-            container.run(['changes-client',
-                           '--server', args.api_url,
-                           '--jobstep_id', args.jobstep_id], user=args.user)
-        if save_snapshot:
-            snapshot = container.create_image()
-            print(" ==> Snapshot saved: {}".format(snapshot))
-            container.upload_image(snapshot=snapshot)
-
-            api.update_snapshot_image(snapshot, {"status": "active"})
-    except Exception as e:
-        if args.jobstep_id:
-            api.update_jobstep(args.jobstep_id, {"status": "finished", "result": "failed"})
-
-            if save_snapshot:
-                api.update_snapshot_image(snapshot, {"status": "failed"})
-
-        if client:
-            client.captureException()
-        raise e
-    finally:
-        if args.jobstep_id:
-            api.update_jobstep(args.jobstep_id, {"status": "finished"})
-
-        if not args.keep:
-            container.destroy()
-        else:
-            print(" ==> Container kept at {}".format(container.rootfs))
-            print(" ==> SSH available via:")
-            print(" ==>   $ sudo lxc-attach --name={}".format(container.name))
