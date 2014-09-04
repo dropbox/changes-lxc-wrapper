@@ -92,7 +92,7 @@ class WrapperCommand(object):
             reporter = LogReporter(api, args.jobstep_id)
             reporter_thread = Thread(target=reporter.process)
             reporter_thread.start()
-            self.patch_system_logging(reporter)
+            # self.patch_system_logging(reporter)
         else:
             reporter_thread = None
 
