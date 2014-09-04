@@ -166,7 +166,7 @@ class WrapperCommand(object):
                                '--jobstep_id', args.jobstep_id], user=args.user)
             if save_snapshot:
                 snapshot = container.create_image()
-                print(" ==> Snapshot saved: {}".format(snapshot))
+                print("==> Snapshot saved: {}".format(snapshot))
                 container.upload_image(snapshot=snapshot)
 
                 api.update_snapshot_image(snapshot, {"status": "active"})
@@ -186,9 +186,9 @@ class WrapperCommand(object):
             if not args.keep:
                 container.destroy()
             else:
-                print(" ==> Container kept at {}".format(container.rootfs))
-                print(" ==> SSH available via:")
-                print(" ==>   $ sudo lxc-attach --name={}".format(container.name))
+                print("==> Container kept at {}".format(container.rootfs))
+                print("==> SSH available via:")
+                print("==>   $ sudo lxc-attach --name={}".format(container.name))
 
             if reporter_thread:
                 reporter.close()
