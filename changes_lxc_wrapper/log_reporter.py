@@ -72,7 +72,6 @@ class LogReporter(object):
                         'text': chunk,
                         'source': self.source,
                     })
-                    sys.stdout.write(chunk)
                 if not self.done.is_set():
                     self.cv.wait(5)
 

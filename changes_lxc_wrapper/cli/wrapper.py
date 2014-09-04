@@ -18,6 +18,16 @@ DESCRIPTION = "LXC Wrapper for running Changes jobs"
 DEFAULT_RELEASE = 'precise'
 
 
+class WrappedOutput(object):
+    def __init__(self, stream, reporter):
+        self.stream = stream
+        self.reporter = reporter
+
+    def write(self, chunk):
+        self.stream.write(chunk)
+        self.reporter.write(chunk)
+
+
 class WrapperCommand(object):
     def __init__(self, argv=None):
         self.argv = argv
@@ -66,7 +76,8 @@ class WrapperCommand(object):
         root.addHandler(SentryHandler())
 
     def patch_system_logging(self, reporter):
-        sys.stdout = sys.stderr = reporter
+        sys.stdout = WrappedOutput(sys.stdout, reporter)
+        sys.stderr = WrappedOutput(sys.stderr, reporter)
 
     def run(self):
         parser = self.get_arg_parser()
@@ -92,7 +103,7 @@ class WrapperCommand(object):
             reporter = LogReporter(api, args.jobstep_id)
             reporter_thread = Thread(target=reporter.process)
             reporter_thread.start()
-            # self.patch_system_logging(reporter)
+            self.patch_system_logging(reporter)
         else:
             reporter_thread = None
 
