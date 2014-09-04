@@ -16,7 +16,7 @@ class ChangesApi(object):
             data = urlencode(data).encode('utf-8')
 
         url = '{}/{}'.format(self.base_url, path.lstrip('/'))
-        logging.info('Making request to {}'.format(url))
+        logging.info('Making request to %s', url)
         for retry_num in range(max_retries):
             try:
                 fp = urlopen(url, data=data, timeout=5)
