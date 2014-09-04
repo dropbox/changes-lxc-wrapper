@@ -14,7 +14,7 @@ tests_require = [
 ]
 
 install_requires = [
-    'raven>=4.0.4,<4.1.0',
+    'raven>=5.0.0,<5.1.0',
 ]
 
 setup(
