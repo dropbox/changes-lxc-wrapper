@@ -36,6 +36,8 @@ setup(
     include_package_data=True,
     classifiers=[
         '__DO NOT UPLOAD__',
+        'Programming Language :: Python',
+        'Programming Language :: Python :: 3',
         'Intended Audience :: Developers',
         'Intended Audience :: System Administrators',
         'Operating System :: OS Independent',
