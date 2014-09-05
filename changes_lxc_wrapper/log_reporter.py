@@ -84,3 +84,6 @@ class LogReporter(object):
         with self.cv:
             self.done.set()
             self.cv.notifyAll()
+
+    def flush(self):
+        pass

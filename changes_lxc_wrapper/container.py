@@ -68,7 +68,7 @@ class Container(lxc.Container):
 
         remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
-        print(" ==> Downloading image {}".format(snapshot))
+        print("==> Downloading image {}".format(snapshot))
         assert not subprocess.call(
             ["aws", "s3", "sync", remote_path, local_path],
             env=os.environ.copy(),
@@ -81,7 +81,7 @@ class Container(lxc.Container):
         local_path = "/var/cache/lxc/download/{}".format(path)
         remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
-        print(" ==> Uploading image {}".format(snapshot))
+        print("==> Uploading image {}".format(snapshot))
         assert not subprocess.call(
             ["aws", "s3", "sync", local_path, remote_path],
             env=os.environ.copy(),
@@ -90,7 +90,7 @@ class Container(lxc.Container):
     def run_script(self, script_path, **kwargs):
         if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
             new_name = os.path.join("tmp", "script-{}".format(uuid4().hex))
-            print(" ==> Writing local script {} as /{}".format(script_path, new_name))
+            print("==> Writing local script {} as /{}".format(script_path, new_name))
             shutil.copy(script_path, os.path.join(self.rootfs, new_name))
             script_path = '/' + new_name
             self.run(['chmod', '0755', script_path], quiet=True)
@@ -127,12 +127,12 @@ class Container(lxc.Container):
             return subprocess.call(cmd, cwd=cwd, env=new_env)
 
         if not quiet:
-            print(" ==> Running: {}".format(cmd))
+            print("==> Running: {}".format(cmd))
 
         ret_code = self.attach_wait(run, (cmd, cwd, env), env_policy=lxc.LXC_ATTACH_CLEAR_ENV)
 
         if not quiet:
-            print(" ==> Command exited: {}".format(ret_code))
+            print("==> Command exited: {}".format(ret_code))
 
         return ret_code
 
@@ -180,7 +180,7 @@ class Container(lxc.Container):
             else:
                 base = lxc.Container(self.snapshot)
 
-            print(" ==> Overlaying container: {}".format(self.snapshot))
+            print("==> Overlaying container: {}".format(self.snapshot))
             assert base.clone(self.name, flags=lxc.LXC_CLONE_KEEPNAME | lxc.LXC_CLONE_SNAPSHOT), (
                 "Failed to clone: {}".format(self.snapshot))
             assert self.load_config(), "Unable to reload container config"
@@ -192,8 +192,9 @@ class Container(lxc.Container):
             if flush_cache:
                 create_args.extend(['--flush-cache'])
 
-            print(" ==> Creating container")
-            assert self.create('ubuntu', args=create_args), "Failed to create container"
+            print("==> Creating container")
+            assert self.create('ubuntu', args=create_args), \
+                "Failed to create container. Try running this command as root."
 
         if pre:
             pre_env = dict(os.environ, LXC_ROOTFS=self.rootfs, LXC_NAME=self.name)
@@ -205,16 +206,16 @@ class Container(lxc.Container):
         assert self.append_config_item('lxc.cgroup.devices.allow', 'c 10:137 rwm')
         assert self.append_config_item('lxc.cgroup.devices.allow', 'b 6:* rwm')
 
-        print(" ==> Starting container")
+        print("==> Starting container")
         assert self.start(), "Failed to start base container"
 
-        print(" ==> Waiting for container to startup networking")
+        print("==> Waiting for container to startup networking")
         assert self.get_ips(family='inet', timeout=30), "Failed to connect to container"
 
-        print(" ==> Install ca-certificates")
+        print("==> Install ca-certificates")
         assert self.install(["ca-certificates"]) == 0
 
-        print(" ==> Setting up sudoers")
+        print("==> Setting up sudoers")
         assert self.setup_sudoers(), "Failed to setup sudoers"
 
         if post:
@@ -226,23 +227,23 @@ class Container(lxc.Container):
         dest = "/var/cache/lxc/download/{}".format(
             self.get_image_path(snapshot))
 
-        print(" ==> Stopping container")
+        print("==> Stopping container")
         self.stop()
 
         assert self.wait('STOPPED', timeout=30)
 
-        print(" ==> Saving snapshot to {}".format(dest))
+        print("==> Saving snapshot to {}".format(dest))
         if not os.path.exists(dest):
             os.makedirs(dest)
 
-        print(" ==> Creating metadata")
+        print("==> Creating metadata")
         with open(os.path.join(dest, "config"), "w") as fp:
             fp.write("lxc.include = LXC_TEMPLATE_CONFIG/ubuntu.common.conf\n")
             fp.write("lxc.arch = x86_64\n")
 
         rootfs_txz = os.path.join(dest, "rootfs.tar.xz")
 
-        print(" ==> Creating rootfs.tar.xz")
+        print("==> Creating rootfs.tar.xz")
         subprocess.check_call(["tar", "-Jcf", rootfs_txz,
                                "-C", self.get_config_item('lxc.rootfs'),
                                "."])
@@ -254,14 +255,14 @@ class Container(lxc.Container):
 
     def destroy(self, timeout=-1):
         if not self.defined:
-            print(" ==> No container to destroy")
+            print("==> No container to destroy")
             return
 
         if self.running:
-            print(" ==> Container is running, stop it first")
+            print("==> Container is running, stop it first")
             self.stop()
-            print(" ==> Wait for container to stop")
+            print("==> Wait for container to stop")
             self.wait('STOPPED', timeout=timeout)
 
-        print(" ==> Destroying container")
+        print("==> Destroying container")
         super().destroy()

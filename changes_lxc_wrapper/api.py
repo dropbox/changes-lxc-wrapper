@@ -24,13 +24,20 @@ class ChangesApi(object):
                 body = fp.read().decode('utf-8')
                 return json.loads(body)
             except URLError as e:
-                if retry_num < max_retries - 1:
-                    retry_delay = retry_num ** 2
-                    print(" ==> API request failed ({}), retrying in {}s".format(
-                        getattr(e, 'code', type(e)), retry_delay))
-                    time.sleep(retry_delay)
-        print(" ==> Failed request to {}".format(path))
-        raise
+                code = getattr(e, 'code', None)
+                if code == 404:
+                    # this suggests that a primary key is wrong, or the
+                    # base url is incorrect
+                    raise
+
+                if retry_num == max_retries - 1:
+                    print("==> Failed request to {}".format(path))
+                    raise
+
+                retry_delay = (retry_num + 1) ** 2
+                print("==> API request failed ({}), retrying in {}s".format(
+                    code or e, retry_delay))
+                time.sleep(retry_delay)
 
     def update_jobstep(self, jobstep_id, data):
         return self.request('/jobsteps/{}/'.format(jobstep_id), data)

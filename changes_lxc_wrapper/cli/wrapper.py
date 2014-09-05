@@ -3,6 +3,7 @@
 import argparse
 import logging
 import sys
+import traceback
 
 from raven.handlers.logging import SentryHandler
 from threading import Thread
@@ -18,6 +19,10 @@ DESCRIPTION = "LXC Wrapper for running Changes jobs"
 DEFAULT_RELEASE = 'precise'
 
 
+class CommandError(Exception):
+    pass
+
+
 class WrappedOutput(object):
     def __init__(self, stream, reporter):
         self.stream = stream
@@ -26,6 +31,10 @@ class WrappedOutput(object):
     def write(self, chunk):
         self.stream.write(chunk)
         self.reporter.write(chunk)
+
+    def flush(self):
+        self.stream.flush()
+        self.reporter.flush()
 
 
 class WrapperCommand(object):
@@ -88,111 +97,172 @@ class WrapperCommand(object):
         except ValueError:
             pass
 
+        assert args.clean or not (args.save_snapshot and args.snapshot), \
+            "You cannot create a snapshot from an existing snapshot"
+
         self.configure_logging(args.log_level)
 
-        if args.api_url:
-            api = ChangesApi(args.api_url)
-        else:
-            assert not args.jobstep_id, "jobstep_id passed without api_url"
-            api = None
+        if args.jobstep_id:
+            return self.run_remote(args)
+        return self.run_local(args)
 
+    def run_local(self, args):
+        """
+        Run a local-only build (i.e. for testing).
+        """
+        snapshot = str(args.snapshot) if args.snapshot else None
+        release = args.release or DEFAULT_RELEASE
+
+        self.run_build_script(
+            snapshot=snapshot,
+            release=release,
+            validate=args.validate,
+            s3_bucket=args.s3_bucket,
+            pre_launch=args.pre_launch,
+            post_launch=args.post_launch,
+            clean=args.clean,
+            flush_cache=args.flush_cache,
+            save_snapshot=args.save_snapshot,
+            user=args.user,
+            cmd=args.cmd,
+            keep=args.keep,
+        )
+
+    def run_remote(self, args):
+        """
+        Run a build script from upstream (Changes), pulling any required
+        information from the remote server, as well as pushing up status
+        changes and log information.
+        """
+        if not args.api_url:
+            raise CommandError('jobstep_id passed, but missing api_url')
+
+        api = ChangesApi(args.api_url)
         jobstep_id = args.jobstep_id
 
-        # setup log capturing
         if jobstep_id:
-            reporter = LogReporter(api, args.jobstep_id)
+            reporter = LogReporter(api, jobstep_id)
             reporter_thread = Thread(target=reporter.process)
             reporter_thread.start()
             self.patch_system_logging(reporter)
         else:
             reporter_thread = None
 
-        if jobstep_id:
-            # fetch build information to set defaults for things like snapshot
-            # TODO(dcramer): make this support a small amount of downtime
-            # TODO(dcramer): make this verify the snapshot
-            resp = api.get_jobstep(args.jobstep_id)
-            assert resp['status']['id'] != 'finished', \
-                'JobStep already marked as finished, aborting.'
+        # we wrap the actual run routine to make it easier to catch
+        # top level exceptions and report them via the log
+        def inner_run():
+            try:
+                # fetch build information to set defaults for things like snapshot
+                # TODO(dcramer): make this support a small amount of downtime
+                # TODO(dcramer): make this verify the snapshot
+                resp = api.get_jobstep(jobstep_id)
+                if resp['status']['id'] == 'finished':
+                    raise Exception('JobStep already marked as finished, aborting.')
 
-            release = resp['data'].get('release') or DEFAULT_RELEASE
+                release = resp['data'].get('release') or DEFAULT_RELEASE
 
-            # If we're expected a snapshot output we need to override
-            # any snapshot parameters, and also ensure we're creating a clean
-            # image
-            if resp['expectedSnapshot']:
-                snapshot = str(UUID(resp['expectedSnapshot']['id']))
-                save_snapshot = True
-                clean = True
+                # If we're expected a snapshot output we need to override
+                # any snapshot parameters, and also ensure we're creating a clean
+                # image
+                if resp['expectedSnapshot']:
+                    snapshot = str(UUID(resp['expectedSnapshot']['id']))
+                    save_snapshot = True
+                    clean = True
+
+                else:
+                    if resp['snapshot']:
+                        snapshot = str(UUID(resp['snapshot']['id']))
+                    else:
+                        snapshot = None
+                    save_snapshot = False
+                    clean = False
+
+                api.update_jobstep(jobstep_id, {"status": "in_progress"})
+
+                cmd = ['changes-client', '--server', args.api_url,
+                       '--jobstep_id', jobstep_id]
+
+                self.run_build_script(
+                    snapshot=snapshot,
+                    release=release,
+                    validate=args.validate,
+                    s3_bucket=args.s3_bucket,
+                    pre_launch=args.pre_launch,
+                    post_launch=args.post_launch,
+                    clean=clean,
+                    flush_cache=args.flush_cache,
+                    save_snapshot=save_snapshot,
+                    user=args.user,
+                    cmd=cmd,
+                    keep=args.keep,
+                )
+
+            except Exception:
+                reporter.write(traceback.format_exc())
+
+                api.update_jobstep(jobstep_id, {"status": "finished", "result": "failed"})
+                if save_snapshot:
+                    api.update_snapshot_image(snapshot, {"status": "failed"})
+
+                raise
 
             else:
-                if resp['snapshot']:
-                    snapshot = str(UUID(resp['snapshot']['id']))
-                else:
-                    snapshot = None
-                save_snapshot = False
-                clean = False
+                api.update_jobstep(jobstep_id, {"status": "finished"})
+                if save_snapshot:
+                    api.update_snapshot_image(snapshot, {"status": "active"})
 
-        else:
-            clean = args.clean
-            snapshot = str(args.snapshot) if args.snapshot else None
-            save_snapshot = args.save_snapshot
-            release = args.release or DEFAULT_RELEASE
+        try:
+            inner_run()
+        except Exception:
+            reporter.write(traceback.format_exc())
+            raise
+        finally:
+            if reporter_thread:
+                reporter.close()
+                reporter_thread.join()
 
-        assert clean or not (save_snapshot and snapshot), \
-            "You cannot create a snapshot from an existing snapshot"
-
+    def run_build_script(self, snapshot, release, validate, s3_bucket, pre_launch,
+                         post_launch, clean, flush_cache, save_snapshot,
+                         user, cmd=None, script=None, keep=False):
+        """
+        Run the given build script inside of the LXC container.
+        """
         container = Container(
             snapshot=snapshot,
             release=release,
-            validate=args.validate,
-            s3_bucket=args.s3_bucket,
+            validate=validate,
+            s3_bucket=s3_bucket,
         )
 
-        try:
-            if args.jobstep_id:
-                api.update_jobstep(args.jobstep_id, {"status": "in_progress"})
+        assert not (cmd and script), \
+            'Only one of cmd or script can be specified'
 
-            container.launch(args.pre_launch, args.post_launch, clean, args.flush_cache)
+        assert cmd or script, \
+            'Missing build command'
+
+        try:
+            container.launch(pre_launch, post_launch, clean, flush_cache)
 
             # TODO(dcramer): we should assert only one type of command arg is set
-            if args.cmd:
-                container.run(args.cmd, user=args.user)
-            if args.script:
-                container.run_script(args.script, user=args.user)
-            if args.api_url and args.jobstep_id:
-                container.run(['changes-client',
-                               '--server', args.api_url,
-                               '--jobstep_id', args.jobstep_id], user=args.user)
+            if cmd:
+                container.run(cmd, user=user)
+            elif script:
+                container.run_script(script, user=user)
+
             if save_snapshot:
                 snapshot = container.create_image()
                 print("==> Snapshot saved: {}".format(snapshot))
                 container.upload_image(snapshot=snapshot)
-
-                api.update_snapshot_image(snapshot, {"status": "active"})
         except Exception as e:
-            if args.jobstep_id:
-                api.update_jobstep(args.jobstep_id, {"status": "finished", "result": "failed"})
-
-                if save_snapshot:
-                    api.update_snapshot_image(snapshot, {"status": "failed"})
-
             logging.exception(e)
             raise e
         finally:
-            if args.jobstep_id:
-                api.update_jobstep(args.jobstep_id, {"status": "finished"})
-
-            if not args.keep:
+            if not keep:
                 container.destroy()
             else:
                 print("==> Container kept at {}".format(container.rootfs))
                 print("==> SSH available via:")
                 print("==>   $ sudo lxc-attach --name={}".format(container.name))
-
-            if reporter_thread:
-                reporter.close()
-                reporter_thread.join()
 
 
 def main():
