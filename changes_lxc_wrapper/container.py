@@ -4,6 +4,7 @@ import shutil
 import socket
 import subprocess
 
+from time import time
 from uuid import uuid4
 
 DEFAULT_RELEASE = 'precise'
@@ -69,10 +70,14 @@ class Container(lxc.Container):
         remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
         print("==> Downloading image {}".format(snapshot))
+        start = time()
         assert not subprocess.call(
             ["aws", "s3", "sync", remote_path, local_path],
             env=os.environ.copy(),
         ), "Failed to download image {}".format(remote_path)
+        stop = time()
+        print("==> Image {} downloaded in {}s".format(
+            snapshot, int((stop - start) * 100) / 100))
 
     def upload_image(self, snapshot):
         assert self.s3_bucket, 'Missing S3 bucket configuration'
@@ -81,11 +86,15 @@ class Container(lxc.Container):
         local_path = "/var/cache/lxc/download/{}".format(path)
         remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
+        start = time()
         print("==> Uploading image {}".format(snapshot))
         assert not subprocess.call(
             ["aws", "s3", "sync", local_path, remote_path],
             env=os.environ.copy(),
         ), "Failed to upload image {}".format(remote_path)
+        stop = time()
+        print("==> Image {} uploaded in {}s".format(
+            snapshot, int((stop - start) * 100) / 100))
 
     def run_script(self, script_path, **kwargs):
         if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
