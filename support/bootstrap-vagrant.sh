@@ -13,6 +13,9 @@ sudo apt-get install -y python3 python3-setuptools python3-pip
 # Install aws cli tools
 sudo apt-get install -y awscli
 
+# Install git
+sudo apt-get install -y git
+
 # Install lxc
 sudo apt-get install -y libcgmanager0 lxc
 
