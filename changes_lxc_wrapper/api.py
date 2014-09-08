@@ -7,6 +7,10 @@ from urllib.parse import urlencode
 from urllib.request import urlopen
 
 
+class BuildCancelled(Exception):
+    pass
+
+
 class ChangesApi(object):
     def __init__(self, base_url):
         self.base_url = base_url.rstrip('/')
@@ -29,6 +33,9 @@ class ChangesApi(object):
                     # this suggests that a primary key is wrong, or the
                     # base url is incorrect
                     raise
+
+                if code == 410:
+                    raise BuildCancelled
 
                 if retry_num == max_retries - 1:
                     print("==> Failed request to {}".format(path))

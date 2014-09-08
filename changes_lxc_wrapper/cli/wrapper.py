@@ -9,7 +9,7 @@ from raven.handlers.logging import SentryHandler
 from threading import Thread
 from uuid import UUID
 
-from ..api import ChangesApi
+from ..api import BuildCancelled, ChangesApi
 from ..container import Container
 from ..log_reporter import LogReporter
 
