@@ -21,4 +21,4 @@ sudo apt-get install -y ruby-dev gcc
 sudo gem install fpm --no-ri --no-rdoc
 
 cd /vagrant/
-sudo pip install -e .
+sudo pip3 install -e .
