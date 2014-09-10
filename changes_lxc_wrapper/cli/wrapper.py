@@ -125,6 +125,7 @@ class WrapperCommand(object):
             save_snapshot=args.save_snapshot,
             user=args.user,
             cmd=args.cmd,
+            script=args.script,
             keep=args.keep,
         )
 
