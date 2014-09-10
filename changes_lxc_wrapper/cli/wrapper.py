@@ -97,9 +97,6 @@ class WrapperCommand(object):
         except ValueError:
             pass
 
-        assert args.clean or not (args.save_snapshot and args.snapshot), \
-            "You cannot create a snapshot from an existing snapshot"
-
         self.configure_logging(args.log_level)
 
         if args.jobstep_id:
@@ -234,6 +231,12 @@ class WrapperCommand(object):
             validate=validate,
             s3_bucket=s3_bucket,
         )
+
+        assert clean or not (save_snapshot and snapshot), \
+            "You cannot create a snapshot from an existing snapshot"
+
+        assert not save_snapshot or snapshot, \
+            'Missing snapshot ID'
 
         assert not (cmd and script), \
             'Only one of cmd or script can be specified'
