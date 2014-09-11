@@ -40,9 +40,3 @@ export PATH=`pwd`/env/bin:$PATH
 
 sudo -u postgres createuser -s `whoami` --no-password || true
 sudo -u postgres createdb changes || true
-
-pip freeze
-
-sudo rm -rf /home/ubuntu/.npm
-
-make install-test-requirements
