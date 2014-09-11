@@ -71,4 +71,4 @@ Running the Sample Build
 
 Assuming you're using the VM, login and jump into /vagrant/. Once there, you can run the following:
 
-    $ sudo ./changes-lxc-wrapper --script examples/changes
+    $ sudo changes-lxc-wrapper --script examples/changes
