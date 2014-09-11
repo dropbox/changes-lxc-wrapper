@@ -9,6 +9,8 @@ from uuid import uuid4
 
 DEFAULT_RELEASE = 'precise'
 
+SNAPSHOT_CACHE = '/var/cache/lxc/download'
+
 
 class Container(lxc.Container):
     def __init__(self, release, snapshot=None, validate=True, s3_bucket=None,
@@ -83,7 +85,7 @@ class Container(lxc.Container):
         assert self.s3_bucket, 'Missing S3 bucket configuration'
 
         path = self.get_image_path(snapshot)
-        local_path = "/var/cache/lxc/download/{}".format(path)
+        local_path = "{}/{}".format(SNAPSHOT_CACHE, path)
         remote_path = "s3://{}/{}".format(self.s3_bucket, path)
 
         start = time()
