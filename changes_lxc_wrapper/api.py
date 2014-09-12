@@ -57,3 +57,6 @@ class ChangesApi(object):
 
     def append_log(self, jobstep_id, data):
         return self.request('/jobsteps/{}/logappend/'.format(jobstep_id), data)
+
+    def list_snapshots(self):
+        return self.request('/snapshots/?state=valid&per_page=0')
