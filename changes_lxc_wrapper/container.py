@@ -7,8 +7,6 @@ import subprocess
 from time import time
 from uuid import uuid4
 
-DEFAULT_RELEASE = 'precise'
-
 SNAPSHOT_CACHE = '/var/cache/lxc/download'
 
 
