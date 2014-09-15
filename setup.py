@@ -31,6 +31,7 @@ setup(
     entry_points={
         'console_scripts': [
             'changes-lxc-wrapper = changes_lxc_wrapper.cli.wrapper:main',
+            'changes-snapshot-manager = changes_lxc_wrapper.cli.manager:main',
         ],
     },
     include_package_data=True,
