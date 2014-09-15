@@ -138,13 +138,10 @@ class WrapperCommand(object):
         api = ChangesApi(args.api_url)
         jobstep_id = args.jobstep_id
 
-        if jobstep_id:
-            reporter = LogReporter(api, jobstep_id)
-            reporter_thread = Thread(target=reporter.process)
-            reporter_thread.start()
-            self.patch_system_logging(reporter)
-        else:
-            reporter_thread = None
+        reporter = LogReporter(api, jobstep_id)
+        reporter_thread = Thread(target=reporter.process)
+        reporter_thread.start()
+        self.patch_system_logging(reporter)
 
         # we wrap the actual run routine to make it easier to catch
         # top level exceptions and report them via the log
@@ -215,9 +212,8 @@ class WrapperCommand(object):
             reporter.write(traceback.format_exc())
             raise
         finally:
-            if reporter_thread:
-                reporter.close()
-                reporter_thread.join()
+            reporter.close()
+            reporter_thread.join()
 
     def run_build_script(self, snapshot, release, validate, s3_bucket, pre_launch,
                          post_launch, clean, flush_cache, save_snapshot,
