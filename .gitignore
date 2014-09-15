@@ -1,5 +1,6 @@
 build
 /.vagrant/
+/env/
 *.deb
 *.egg-info/
 *.pyc
