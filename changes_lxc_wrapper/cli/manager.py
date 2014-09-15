@@ -136,6 +136,9 @@ class ManagerCommand(object):
 
         for snapshot in sorted(cache.snapshots, key=get_sort_value):
             # this snapshot is unknown or has been invalidated
+            if snapshot.is_active:
+                continue
+
             if not snapshot.is_valid:
                 cache.remove(snapshot, wipe_on_disk)
                 continue
@@ -154,6 +157,8 @@ class ManagerCommand(object):
                 # keep removing old snapshots until we're under the threshold
                 while class_size > args.max_disk_per_class:
                     snapshot = snapshots_by_class.pop(0)
+                    if snapshot.is_active:
+                        continue
                     cache.remove(snapshot, wipe_on_disk)
                     class_size -= snapshot.size
 
@@ -165,6 +170,8 @@ class ManagerCommand(object):
 
         while cache.total_size > args.max_disk:
             snapshot = next(snapshot_size_iter)
+            if snapshot.is_active:
+                continue
             cache.remove(snapshot, wipe_on_disk)
 
 
