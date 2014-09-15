@@ -213,8 +213,9 @@ class WrapperCommand(object):
         heartbeat_thread.start()
 
         run_thread = Thread(target=inner_run, args=[api, jobstep_id])
+        run_thread.daemon = True
         run_thread.start()
-        while run_thread.is_alive():
+        while run_thread.is_alive() and heartbeat_thread.is_alive():
             try:
                 run_thread.join(10)
             except Exception:
@@ -222,16 +223,15 @@ class WrapperCommand(object):
                 break
             sleep(1)
 
-            if not heartbeat_thread.is_alive():
-                if run_thread.is_alive():
-                    run_thread._Thread__stop()
-                run_thread.join()
+        # give it a second chance in case there was a race between the heartbeat
+        # and the builder
+        run_thread.join(5)
 
         reporter.close()
         heartbeater.close()
 
-        reporter_thread.join()
-        heartbeat_thread.join()
+        reporter_thread.join(60)
+        heartbeat_thread.join(1)
 
     def run_build_script(self, snapshot, release, validate, s3_bucket, pre_launch,
                          post_launch, clean, flush_cache, save_snapshot,
