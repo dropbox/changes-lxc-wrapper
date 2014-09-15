@@ -21,7 +21,7 @@ def convert_date(value):
     return datetime.strptime(value, DATETIME_FORMAT)
 
 
-class Snapshot(object):
+class SnapshotImage(object):
     def __init__(self, id, path, date_created=None, is_active=None,
                  is_valid=True, project=None):
         self.id = id
@@ -48,18 +48,20 @@ class SnapshotCache(object):
         if path_list:
             # get upstream metadata
             print("==> Fetching upstream metadata")
-            for item in self.api.list_snapshots():
-                item['id'] = UUID(item['id'])
-                item['project']['id'] = UUID(item['project']['id'])
-                item['dateCreated'] = convert_date(item['dateCreated'])
-                upstream_data[item['id']] = item
+            for snapshot in self.api.list_snapshots():
+                for image in snapshot['images']:
+                    upstream_data[UUID(image['id'])] = {
+                        'project': UUID(snapshot['project']['id']),
+                        'date_created': convert_date(snapshot['dateCreated']),
+                        'is_active': snapshot['isActive'],
+                    }
 
         # collect size information for each path
         snapshot_list = []
         for path in path_list:
             id_ = UUID(path.rsplit('/', 1)[-1])
             path_data = upstream_data.get(id_, {})
-            snapshot_list.append(Snapshot(
+            snapshot_list.append(SnapshotImage(
                 id=id_,
                 path=path,
                 is_active=path_data.get('is_active', False),
