@@ -16,8 +16,8 @@ deb:
 
 setup-test-env:
 	virtualenv --python=`which python3` ./env --system-site-packages
-	env/bin/pip3 install -e .
-	env/bin/pip3 install "file://`pwd`#egg=changes-lxc-wrapper[tests]"
+	env/bin/pip install -e .
+	env/bin/pip install "file://`pwd`#egg=changes-lxc-wrapper[tests]"
 
 test:
 	env/bin/py.test
