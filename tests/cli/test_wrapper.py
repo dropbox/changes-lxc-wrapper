@@ -101,3 +101,36 @@ def test_already_finished_job(mock_run, mock_api_cls):
     command.run()
 
     assert not mock_run.called
+
+
+@patch('changes_lxc_wrapper.cli.wrapper.ChangesApi')
+@patch.object(WrapperCommand, 'run_build_script')
+def test_non_default_release(mock_run, mock_api_cls):
+    jobstep_id = uuid4()
+
+    jobstep_data = generate_jobstep_data()
+    jobstep_data['data']['release'] = 'fakerelease'
+
+    mock_api = mock_api_cls.return_value
+    mock_api.get_jobstep.return_value = jobstep_data
+
+    command = WrapperCommand([
+        '--jobstep-id', jobstep_id.hex,
+        '--api-url', 'http://changes.example.com',
+    ])
+    command.run()
+
+    mock_run.assert_called_once_with(
+        release='fakerelease',
+        post_launch=None,
+        snapshot='a1028849-e8cf-4ff0-a7d7-fdfe3c4fe925',
+        save_snapshot=False,
+        s3_bucket=None,
+        pre_launch=None,
+        validate=True,
+        user='ubuntu',
+        cmd=['changes-client', '--server', 'http://changes.example.com', '--jobstep_id', jobstep_id.hex],
+        flush_cache=False,
+        clean=False,
+        keep=False,
+    )
