@@ -167,7 +167,7 @@ class ManagerCommand(object):
             cache.snapshots, key=lambda x: x.size, reverse=True))
 
         while cache.total_size > args.max_disk:
-            snapshot = snapshot_size_iter.next()
+            snapshot = next(snapshot_size_iter)
             print("==> Removing snapshot {} (disk reclaim)".format(snapshot.id))
             cache.remove(snapshot, wipe_on_disk)
 
