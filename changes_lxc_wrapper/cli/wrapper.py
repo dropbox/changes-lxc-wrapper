@@ -228,9 +228,6 @@ class WrapperCommand(object):
         assert clean or not (save_snapshot and snapshot), \
             "You cannot create a snapshot from an existing snapshot"
 
-        assert save_snapshot or snapshot, \
-            'Missing snapshot ID'
-
         assert not (cmd and script), \
             'Only one of cmd or script can be specified'
 
