@@ -37,6 +37,16 @@ def parse_ttl_date(value):
     return datetime.utcnow() - timedelta(seconds=int(value))
 
 
+def format_size_value(value):
+    if value > 1024 * 1024 * 1024:
+        return '{}GB'.format(value // 1024 // 1024 // 1024)
+    if value > 1024 * 1024:
+        return '{}MB'.format(value // 1024 // 1024)
+    if value > 1024:
+        return '{}KB'.format(value // 1024)
+    return '{}B'.format(value)
+
+
 class ManagerCommand(object):
     """
     Bound image cache to:
@@ -58,6 +68,7 @@ class ManagerCommand(object):
 
     def get_arg_parser(self):
         parser = argparse.ArgumentParser(description=DESCRIPTION)
+        parser.add_argument('--cache-path', default=SNAPSHOT_CACHE)
         parser.add_argument('--api-url', required=True,
                             help="API URL to Changes (i.e. https://changes.example.com/api/0/)")
 
@@ -66,8 +77,9 @@ class ManagerCommand(object):
         cleanup_parser.add_argument('--max-disk', required=True, type=parse_size_value)
         cleanup_parser.add_argument('--max-disk-per-class', type=parse_size_value)
         cleanup_parser.add_argument('--ttl', type=parse_ttl_date)
-        cleanup_parser.add_argument('--cache-path', default=SNAPSHOT_CACHE)
         cleanup_parser.add_argument('--dry-run', action='store_true', default=False)
+
+        subparsers.add_parser('list', help='List the status of local snapshots')
 
         return parser
 
@@ -75,19 +87,42 @@ class ManagerCommand(object):
         parser = self.get_arg_parser()
         args = parser.parse_args(self.argv)
 
-        if args.command == 'cleanup':
-            self.run_cleanup(args)
-
-    def run_cleanup(self, args):
         api = ChangesApi(args.api_url)
+        cache = SnapshotCache(args.cache_path, api)
+        cache.initialize()
+
+        if args.command == 'cleanup':
+            self.run_cleanup(cache, args)
+
+        elif args.command == 'list':
+            self.run_list(cache, args)
+
+    def run_list(self, cache, args):
+        print('-' * 80)
+        template = '{id:41}  {size:5}  {is_valid:5} {project:10} {date}'
+        print(template.format(
+            id='ID',
+            size='Size',
+            is_valid='Valid',
+            project='Project',
+            date='Date',
+        ))
+        print('-' * 80)
+        for snapshot in cache.snapshots:
+            print(template.format(
+                id=str(snapshot.id) if not snapshot.is_active else '* {}'.format(snapshot.id),
+                size=format_size_value(snapshot.size),
+                is_valid='T' if snapshot.is_valid else 'F',
+                project=snapshot.project or 'n/a',
+                date=snapshot.date_created.date() if snapshot.date_created else 'n/a',
+            ))
+
+    def run_cleanup(self, cache, args):
 
         wipe_on_disk = not args.dry_run
 
         if not wipe_on_disk:
             print("==> DRY RUN: Not removing files on disk")
-
-        cache = SnapshotCache(args.cache_path, api)
-        cache.initialize()
 
         # find snapshot data within Changes
         snapshots_by_class = defaultdict(list)
