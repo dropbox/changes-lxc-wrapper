@@ -113,7 +113,7 @@ class ManagerCommand(object):
                 id=str(snapshot.id) if not snapshot.is_active else '* {}'.format(snapshot.id),
                 size=format_size_value(snapshot.size),
                 is_valid='T' if snapshot.is_valid else 'F',
-                project=snapshot.project or 'n/a',
+                project=str(snapshot.project or 'n/a'),
                 date=snapshot.date_created.date() if snapshot.date_created else 'n/a',
             ))
 
