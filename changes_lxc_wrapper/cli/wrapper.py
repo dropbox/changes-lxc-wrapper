@@ -7,7 +7,7 @@ import traceback
 
 from raven.handlers.logging import SentryHandler
 from threading import Thread
-from uuid import UUID, uuid4
+from uuid import UUID
 
 from ..api import ChangesApi
 from ..container import Container
