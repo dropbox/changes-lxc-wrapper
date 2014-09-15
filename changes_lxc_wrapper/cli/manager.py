@@ -128,7 +128,13 @@ class ManagerCommand(object):
         snapshots_by_class = defaultdict(list)
         used_space_by_class = defaultdict(int)
 
-        for snapshot in sorted(cache.snapshots, key=lambda x: x.date_created):
+        def get_sort_value(snapshot):
+            if snapshot.date_created:
+                return int(snapshot.date_created.strftime('%s'))
+            else:
+                return 0
+
+        for snapshot in sorted(cache.snapshots, key=get_sort_value):
             # this snapshot is unknown or has been invalidated
             if not snapshot.is_valid:
                 print("==> Removing snapshot {} (missing upstream)".format(snapshot.id))
