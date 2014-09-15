@@ -31,6 +31,7 @@ def test_simple():
     cache = SnapshotCache(CACHE_PATH, mock_api)
     cache.initialize()
 
+    cache.snapshots.sort(key=lambda x: x.id)
     assert len(cache.snapshots) == 2
     assert cache.snapshots[0].id == UUID('311a862b-dd15-4c44-90f1-fa95a7621860')
     assert cache.snapshots[0].path == '{}/ubuntu/precise/i386/311a862b-dd15-4c44-90f1-fa95a7621860'.format(CACHE_PATH)
