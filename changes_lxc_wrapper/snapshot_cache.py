@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID
 
 
-DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%Z"
+DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
 def get_directory_size(path):
@@ -18,7 +18,7 @@ def get_directory_size(path):
 
 
 def convert_date(value):
-    return datetime.strptime(value + 'Z', DATETIME_FORMAT)
+    return datetime.strptime(value, DATETIME_FORMAT)
 
 
 class Snapshot(object):
@@ -40,16 +40,19 @@ class SnapshotCache(object):
         self.snapshots = []
 
     def initialize(self):
+        print("==> Initializing snapshot cache")
         # find all valid snapshot paths
         path_list = self._collect_files(self.root)
 
-        # get upstream metadata
         upstream_data = {}
-        for item in self.api.list_snapshots():
-            item['id'] = UUID(item['id'])
-            item['project']['id'] = UUID(item['project']['id'])
-            item['dateCreated'] = convert_date(item['dateCreated'])
-            upstream_data[item['id']] = item
+        if path_list:
+            # get upstream metadata
+            print("==> Fetching upstream metadata")
+            for item in self.api.list_snapshots():
+                item['id'] = UUID(item['id'])
+                item['project']['id'] = UUID(item['project']['id'])
+                item['dateCreated'] = convert_date(item['dateCreated'])
+                upstream_data[item['id']] = item
 
         # collect size information for each path
         snapshot_list = []
@@ -67,14 +70,17 @@ class SnapshotCache(object):
 
         self.snapshots = snapshot_list
 
+        print("==> {} items found in cache ({} bytes)".format(len(self.snapshots), self.total_size))
+
     @property
     def total_size(self):
         return sum(s.size for s in self.snapshots)
 
-    def remove(self, snapshot):
+    def remove(self, snapshot, on_disk=True):
         assert not snapshot.is_active
         print("==> Removing snapshot: {}".format(snapshot.id))
-        shutil.rmtree(snapshot.path)
+        if on_disk:
+            shutil.rmtree(snapshot.path)
         self.snapshots.remove(snapshot)
 
     def _collect_files(self, root):
