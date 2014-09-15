@@ -7,10 +7,12 @@ import traceback
 
 from raven.handlers.logging import SentryHandler
 from threading import Thread
+from time import sleep
 from uuid import UUID
 
 from ..api import ChangesApi
 from ..container import Container
+from ..heartbeat import Heartbeater
 from ..log_reporter import LogReporter
 
 
@@ -135,17 +137,9 @@ class WrapperCommand(object):
         if not args.api_url:
             raise CommandError('jobstep_id passed, but missing api_url')
 
-        api = ChangesApi(args.api_url)
-        jobstep_id = args.jobstep_id
-
-        reporter = LogReporter(api, jobstep_id)
-        reporter_thread = Thread(target=reporter.process)
-        reporter_thread.start()
-        self.patch_system_logging(reporter)
-
         # we wrap the actual run routine to make it easier to catch
         # top level exceptions and report them via the log
-        def inner_run():
+        def inner_run(api, jobstep_id):
             try:
                 # fetch build information to set defaults for things like snapshot
                 # TODO(dcramer): make this support a small amount of downtime
@@ -196,24 +190,48 @@ class WrapperCommand(object):
                 reporter.write(traceback.format_exc())
 
                 api.update_jobstep(jobstep_id, {"status": "finished", "result": "failed"})
-                if save_snapshot:
+                if args.save_snapshot:
                     api.update_snapshot_image(snapshot, {"status": "failed"})
 
                 raise
 
             else:
                 api.update_jobstep(jobstep_id, {"status": "finished"})
-                if save_snapshot:
+                if args.save_snapshot:
                     api.update_snapshot_image(snapshot, {"status": "active"})
 
-        try:
-            inner_run()
-        except Exception:
-            reporter.write(traceback.format_exc())
-            raise
-        finally:
-            reporter.close()
-            reporter_thread.join()
+        api = ChangesApi(args.api_url)
+        jobstep_id = args.jobstep_id
+
+        reporter = LogReporter(api, jobstep_id)
+        reporter_thread = Thread(target=reporter.process)
+        reporter_thread.start()
+        self.patch_system_logging(reporter)
+
+        heartbeater = Heartbeater(api, jobstep_id)
+        heartbeat_thread = Thread(target=heartbeater.wait)
+        heartbeat_thread.start()
+
+        run_thread = Thread(target=inner_run, args=[api, jobstep_id])
+        run_thread.start()
+        while run_thread.is_alive():
+            try:
+                run_thread.join(10)
+            except Exception:
+                reporter.write(traceback.format_exc())
+                break
+            sleep(1)
+
+            if not heartbeat_thread.is_alive():
+                if run_thread.is_alive():
+                    run_thread._Thread__stop()
+                run_thread.join()
+
+        reporter.close()
+        heartbeater.close()
+
+        reporter_thread.join()
+        heartbeat_thread.join()
 
     def run_build_script(self, snapshot, release, validate, s3_bucket, pre_launch,
                          post_launch, clean, flush_cache, save_snapshot,
