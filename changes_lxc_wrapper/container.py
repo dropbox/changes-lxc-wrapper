@@ -20,7 +20,7 @@ class Container(lxc.Container):
         self.s3_bucket = s3_bucket
 
         # This will be the hostname inside the container
-        self.utsname = snapshot
+        self.utsname = snapshot or str(uuid4())
 
         self.validate = validate
 

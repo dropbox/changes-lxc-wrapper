@@ -7,7 +7,7 @@ import traceback
 
 from raven.handlers.logging import SentryHandler
 from threading import Thread
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from ..api import ChangesApi
 from ..container import Container
@@ -225,17 +225,10 @@ class WrapperCommand(object):
         """
         Run the given build script inside of the LXC container.
         """
-        container = Container(
-            snapshot=snapshot,
-            release=release,
-            validate=validate,
-            s3_bucket=s3_bucket,
-        )
-
         assert clean or not (save_snapshot and snapshot), \
             "You cannot create a snapshot from an existing snapshot"
 
-        assert not save_snapshot or snapshot, \
+        assert save_snapshot or snapshot, \
             'Missing snapshot ID'
 
         assert not (cmd and script), \
@@ -243,6 +236,13 @@ class WrapperCommand(object):
 
         assert cmd or script, \
             'Missing build command'
+
+        container = Container(
+            snapshot=snapshot,
+            release=release,
+            validate=validate,
+            s3_bucket=s3_bucket,
+        )
 
         try:
             container.launch(pre_launch, post_launch, clean, flush_cache)
@@ -256,7 +256,8 @@ class WrapperCommand(object):
             if save_snapshot:
                 snapshot = container.create_image()
                 print("==> Snapshot saved: {}".format(snapshot))
-                container.upload_image(snapshot=snapshot)
+                if s3_bucket:
+                    container.upload_image(snapshot=snapshot)
         except Exception as e:
             logging.exception(e)
             raise e
