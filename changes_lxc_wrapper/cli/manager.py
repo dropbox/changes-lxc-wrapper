@@ -169,7 +169,10 @@ class ManagerCommand(object):
             cache.snapshots, key=lambda x: x.size, reverse=True))
 
         while cache.total_size > args.max_disk:
-            snapshot = next(snapshot_size_iter)
+            try:
+                snapshot = next(snapshot_size_iter)
+            except StopIteration:
+                break
             if snapshot.is_active:
                 continue
             cache.remove(snapshot, wipe_on_disk)
