@@ -1,7 +1,6 @@
 from collections import deque
 from functools import wraps
 from threading import Condition, Event, Lock
-import sys
 
 
 def chunked(buffer, chunk_size=4096):
