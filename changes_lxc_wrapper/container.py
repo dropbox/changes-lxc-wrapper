@@ -11,8 +11,8 @@ SNAPSHOT_CACHE = '/var/cache/lxc/download'
 
 
 class Container(lxc.Container):
-    def __init__(self, release, snapshot=None, validate=True, s3_bucket=None,
-                 *args, **kwargs):
+    def __init__(self, name, release=None, snapshot=None, validate=True,
+                 s3_bucket=None, *args, **kwargs):
         self.snapshot = snapshot
         self.release = release
         self.s3_bucket = s3_bucket
@@ -23,7 +23,7 @@ class Container(lxc.Container):
         self.validate = validate
 
         # Randomize container name to prevent clobbering
-        super().__init__(str(uuid4()), *args, **kwargs)
+        super().__init__(name, *args, **kwargs)
 
     @property
     def rootfs(self):

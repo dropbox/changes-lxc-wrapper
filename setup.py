@@ -30,6 +30,7 @@ setup(
     tests_require=tests_require,
     entry_points={
         'console_scripts': [
+            'changes-lxc = changes_lxc_wrapper.cli.helper:main',
             'changes-lxc-wrapper = changes_lxc_wrapper.cli.wrapper:main',
             'changes-snapshot-manager = changes_lxc_wrapper.cli.manager:main',
         ],
