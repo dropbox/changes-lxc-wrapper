@@ -168,8 +168,12 @@ class WrapperCommand(object):
 
                 api.update_jobstep(jobstep_id, {"status": "in_progress"})
 
-                cmd = ['changes-client', '--server', args.api_url,
-                       '--jobstep_id', jobstep_id]
+                cmd = [
+                    'changes-client',
+                    '--server', args.api_url,
+                    '--jobstep_id', jobstep_id,
+                    '--run_as_child',
+                ]
 
                 self.run_build_script(
                     snapshot=snapshot,
