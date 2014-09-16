@@ -223,9 +223,11 @@ class WrapperCommand(object):
                 break
             sleep(1)
 
-        # give it a second chance in case there was a race between the heartbeat
-        # and the builder
-        run_thread.join(5)
+        if run_thread.is_alive():
+            reporter.write('==> Signal received from upstream, terminating.\n')
+            # give it a second chance in case there was a race between the heartbeat
+            # and the builder
+            run_thread.join(5)
 
         reporter.close()
         heartbeater.close()
