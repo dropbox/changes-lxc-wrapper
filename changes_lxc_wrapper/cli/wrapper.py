@@ -12,7 +12,6 @@ from uuid import UUID
 
 from ..api import ChangesApi
 from ..container import Container
-from ..heartbeat import Heartbeater
 from ..log_reporter import LogReporter
 
 
@@ -212,14 +211,10 @@ class WrapperCommand(object):
         reporter_thread.start()
         self.patch_system_logging(reporter)
 
-        heartbeater = Heartbeater(api, jobstep_id)
-        heartbeat_thread = Thread(target=heartbeater.wait)
-        heartbeat_thread.start()
-
         run_thread = Thread(target=inner_run, args=[api, jobstep_id])
         run_thread.daemon = True
         run_thread.start()
-        while run_thread.is_alive() and heartbeat_thread.is_alive():
+        while run_thread.is_alive():
             try:
                 run_thread.join(10)
             except Exception:
@@ -234,10 +229,8 @@ class WrapperCommand(object):
             run_thread.join(5)
 
         reporter.close()
-        heartbeater.close()
 
         reporter_thread.join(60)
-        heartbeat_thread.join(1)
 
     def run_build_script(self, snapshot, release, validate, s3_bucket, pre_launch,
                          post_launch, clean, flush_cache, save_snapshot,
