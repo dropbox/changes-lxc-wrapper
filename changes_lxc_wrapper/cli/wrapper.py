@@ -8,7 +8,7 @@ import traceback
 from raven.handlers.logging import SentryHandler
 from threading import Thread
 from time import sleep
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from ..api import ChangesApi
 from ..container import Container
@@ -248,6 +248,7 @@ class WrapperCommand(object):
             'Missing build command'
 
         container = Container(
+            name=str(uuid4()),
             snapshot=snapshot,
             release=release,
             validate=validate,
