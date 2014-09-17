@@ -1,5 +1,7 @@
 .arcconfig
+.coverage
 build
+/dist/
 /.vagrant/
 /env/
 *.deb
