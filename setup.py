@@ -9,6 +9,7 @@ changes-lxc-wrapper
 from setuptools import setup, find_packages
 
 tests_require = [
+    'coverage',
     'mock>=1.0.1,<1.1.0',
     'pytest>=2.6.1,<2.7.0',
 ]
