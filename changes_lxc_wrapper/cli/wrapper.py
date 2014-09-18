@@ -171,7 +171,6 @@ class WrapperCommand(object):
                     'changes-client',
                     '--server', args.api_url,
                     '--jobstep_id', jobstep_id,
-                    '--run_as_child',
                 ]
 
                 self.run_build_script(
