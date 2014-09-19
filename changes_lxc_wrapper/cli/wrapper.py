@@ -263,6 +263,8 @@ class WrapperCommand(object):
             elif script:
                 container.run_script(script, user=user)
 
+            container.stop()
+
             if save_snapshot:
                 snapshot = container.create_image()
                 print("==> Snapshot saved: {}".format(snapshot))
