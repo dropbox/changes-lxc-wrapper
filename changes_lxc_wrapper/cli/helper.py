@@ -51,6 +51,12 @@ class HelperCommand(object):
         launch_parser.add_argument(
             '--s3-bucket',
             help="S3 Bucket to store/fetch images from")
+        launch_parser.add_argument(
+            '--pre-launch',
+            help="Command to run before container is launched")
+        launch_parser.add_argument(
+            '--post-launch',
+            help="Command to run after container is launched")
 
         exec_parser = subparsers.add_parser('exec', help='Execute a command within a container')
         exec_parser.add_argument(
@@ -96,7 +102,8 @@ class HelperCommand(object):
 
     def run_launch(self, name, snapshot=None, release=DEFAULT_RELEASE,
                    validate=True, s3_bucket=None, clean=False,
-                   flush_cache=False, **kwargs):
+                   flush_cache=False, pre_launch=None, post_launch=None,
+                   **kwargs):
 
         container = Container(
             name=name,
@@ -107,8 +114,8 @@ class HelperCommand(object):
         )
 
         container.launch(
-            pre=None,
-            post=None,
+            pre=pre_launch,
+            post=post_launch,
             clean=clean,
             flush_cache=flush_cache,
         )
