@@ -146,7 +146,7 @@ class HelperCommand(object):
             name=name,
         )
 
-        container.run_script(path, user=user)
+        container.run_script(' '.join(path), user=user)
 
     def run_destroy(self, name, **kwargs):
         container = Container(
