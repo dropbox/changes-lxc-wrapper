@@ -97,12 +97,15 @@ class Container(lxc.Container):
             snapshot, int((stop - start) * 100) / 100))
 
     def run_script(self, script_path, **kwargs):
-        if os.path.isfile(script_path) and not os.path.isfile(os.path.join(self.rootfs, script_path)):
-            new_name = os.path.join("tmp", "script-{}".format(uuid4().hex))
-            print("==> Writing local script {} as /{}".format(script_path, new_name))
-            shutil.copy(script_path, os.path.join(self.rootfs, new_name))
-            script_path = '/' + new_name
-            self.run(['chmod', '0755', script_path], quiet=True)
+        """
+        Runs a local script within the container.
+        """
+        assert os.path.isfile(script_path), "Cannot find local script {}".format(script_path)
+        new_name = os.path.join("tmp", "script-{}".format(uuid4().hex))
+        print("==> Writing local script {} as /{}".format(script_path, new_name))
+        shutil.copy(script_path, os.path.join(self.rootfs, new_name))
+        script_path = '/' + new_name
+        assert self.run(['chmod', '0755', script_path], quiet=True) == 0
         assert self.run([script_path], **kwargs) == 0
 
     def run(self, cmd, cwd=None, env=None, user='root', quiet=False):
