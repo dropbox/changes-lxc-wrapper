@@ -141,12 +141,12 @@ class HelperCommand(object):
 
         container.run(cmd, user=user)
 
-    def run_exec_script(self, name, script, user=DEFAULT_USER, **kwargs):
+    def run_exec_script(self, name, path, user=DEFAULT_USER, **kwargs):
         container = Container(
             name=name,
         )
 
-        container.run_script(script, user=user)
+        container.run_script(path, user=user)
 
     def run_destroy(self, name, **kwargs):
         container = Container(
