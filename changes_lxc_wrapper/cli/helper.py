@@ -69,6 +69,17 @@ class HelperCommand(object):
             'cmd', nargs=argparse.REMAINDER,
             help="Command to run inside the container")
 
+        exec_script_parser = subparsers.add_parser('exec-script', help='Execute a command within a container')
+        exec_script_parser.add_argument(
+            '--user', '-u', default=DEFAULT_USER,
+            help="User to run command as")
+        exec_script_parser.add_argument(
+            'name', nargs='?', type=str,
+            help="Container name")
+        exec_script_parser.add_argument(
+            'path', nargs=argparse.REMAINDER,
+            help="Local script to run inside the container")
+
         destroy_parser = subparsers.add_parser('destroy', help='Destroy a running container')
         destroy_parser.add_argument(
             'name', nargs='?', type=str,
@@ -97,6 +108,8 @@ class HelperCommand(object):
             self.run_launch(**vars(args))
         elif args.command == 'exec':
             self.run_exec(**vars(args))
+        elif args.command == 'exec-script':
+            self.run_exec_script(**vars(args))
         elif args.command == 'destroy':
             self.run_destroy(**vars(args))
 
@@ -127,6 +140,13 @@ class HelperCommand(object):
         )
 
         container.run(cmd, user=user)
+
+    def run_exec_script(self, name, script, user=DEFAULT_USER, **kwargs):
+        container = Container(
+            name=name,
+        )
+
+        container.run_script(script, user=user)
 
     def run_destroy(self, name, **kwargs):
         container = Container(
