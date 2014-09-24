@@ -63,6 +63,9 @@ class HelperCommand(object):
             '--user', '-u', default=DEFAULT_USER,
             help="User to run command as")
         exec_parser.add_argument(
+            '--cwd', default='',
+            help="Working directory for command")
+        exec_parser.add_argument(
             'name', nargs='?', type=str,
             help="Container name")
         exec_parser.add_argument(
@@ -73,6 +76,9 @@ class HelperCommand(object):
         exec_script_parser.add_argument(
             '--user', '-u', default=DEFAULT_USER,
             help="User to run command as")
+        exec_script_parser.add_argument(
+            '--cwd', default='',
+            help="Working directory for command")
         exec_script_parser.add_argument(
             'name', nargs='?', type=str,
             help="Container name")
@@ -134,19 +140,19 @@ class HelperCommand(object):
         )
         print("==> Instance successfully launched as {}".format(name))
 
-    def run_exec(self, name, cmd, user=DEFAULT_USER, **kwargs):
+    def run_exec(self, name, cmd, user=DEFAULT_USER, cwd='', **kwargs):
         container = Container(
             name=name,
         )
 
-        container.run(cmd, user=user)
+        container.run(cmd, user=user, cwd=cwd)
 
-    def run_exec_script(self, name, path, user=DEFAULT_USER, **kwargs):
+    def run_exec_script(self, name, path, user=DEFAULT_USER, cwd='', **kwargs):
         container = Container(
             name=name,
         )
 
-        container.run_script(' '.join(path), user=user)
+        container.run_script(' '.join(path), user=user, cwd=cwd)
 
     def run_destroy(self, name, **kwargs):
         container = Container(
