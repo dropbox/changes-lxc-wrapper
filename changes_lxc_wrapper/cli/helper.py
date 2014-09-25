@@ -63,7 +63,7 @@ class HelperCommand(object):
             '--user', '-u', default=DEFAULT_USER,
             help="User to run command as")
         exec_parser.add_argument(
-            '--cwd', default='',
+            '--cwd',
             help="Working directory for command")
         exec_parser.add_argument(
             'name', nargs='?', type=str,
@@ -77,7 +77,7 @@ class HelperCommand(object):
             '--user', '-u', default=DEFAULT_USER,
             help="User to run command as")
         exec_script_parser.add_argument(
-            '--cwd', default='',
+            '--cwd',
             help="Working directory for command")
         exec_script_parser.add_argument(
             'name', nargs='?', type=str,
@@ -140,14 +140,14 @@ class HelperCommand(object):
         )
         print("==> Instance successfully launched as {}".format(name))
 
-    def run_exec(self, name, cmd, user=DEFAULT_USER, cwd='', **kwargs):
+    def run_exec(self, name, cmd, user=DEFAULT_USER, cwd=None, **kwargs):
         container = Container(
             name=name,
         )
 
         container.run(cmd, user=user, cwd=cwd)
 
-    def run_exec_script(self, name, path, user=DEFAULT_USER, cwd='', **kwargs):
+    def run_exec_script(self, name, path, user=DEFAULT_USER, cwd=None, **kwargs):
         container = Container(
             name=name,
         )
